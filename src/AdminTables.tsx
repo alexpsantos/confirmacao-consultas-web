@@ -96,8 +96,8 @@ function ProfessionalEditor({ item, close, save }: { item: Professional; close: 
 export function PatientEditor({ item, close, save }: { item: Patient; close: () => void; save: (data: object) => Promise<void> }) {
   return <Editor title="Editar paciente" close={close} submit={async form => save({ fullName: form.get('fullName'), birthDate: form.get('birthDate') || null, phone: form.get('phone'), email: form.get('email') || null, preferredChannel: form.get('preferredChannel') })}>
     <label className="span">Nome completo<input name="fullName" defaultValue={item.fullName} required maxLength={150} /></label>
-    <label>Data de nascimento<input name="birthDate" type="date" defaultValue={item.birthDate ?? ''} /></label>
-    <label>Telefone<input name="phone" defaultValue={item.phone} required maxLength={20} inputMode="tel" /></label>
+    <label>Data de nascimento<input name="birthDate" type="date" min="1900-01-01" max={new Date().toISOString().slice(0, 10)} defaultValue={item.birthDate ?? ''} /></label>
+    <label>Telefone<input name="phone" defaultValue={formatPhone(item.phone)} required minLength={13} maxLength={14} inputMode="numeric" pattern="\(\d{2}\)\d{4,5}-\d{4}" title="Informe um telefone com DDD" placeholder="(11)12345-6789" onInput={event => { event.currentTarget.value = formatPhoneInput(event.currentTarget.value) }} /></label>
     <label>E-mail<input name="email" type="email" defaultValue={item.email ?? ''} maxLength={254} pattern="[^\s@]+@[^\s@]+\.[^\s@]+" /></label>
     <label>Canal preferencial<select name="preferredChannel" defaultValue={item.preferredChannel}><option>WHATSAPP</option><option>EMAIL</option></select></label>
   </Editor>
@@ -112,5 +112,6 @@ function Editor({ title, close, submit, children }: { title: string; close: () =
 }
 function message(error: unknown) { return error instanceof Error ? error.message : 'Não foi possível concluir a operação' }
 function consentLabel(value: Patient['consentStatus']) { return value === 'GRANTED' ? 'Concedido' : value === 'REVOKED' ? 'Revogado' : 'Pendente' }
-function formatPhone(value: string) { const digits = value.replace(/\D/g, ''); return digits.length === 11 ? `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}` : digits.length === 10 ? `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}` : value }
+function formatPhone(value: string) { const digits = value.replace(/\D/g, ''); return digits.length === 11 ? `(${digits.slice(0, 2)})${digits.slice(2, 7)}-${digits.slice(7)}` : digits.length === 10 ? `(${digits.slice(0, 2)})${digits.slice(2, 6)}-${digits.slice(6)}` : value }
+function formatPhoneInput(value: string) { const digits = value.replace(/\D/g, '').slice(0, 11); if (!digits) return ''; if (digits.length < 3) return `(${digits}`; if (digits.length <= 6) return `(${digits.slice(0, 2)})${digits.slice(2)}`; const split = digits.length === 11 ? 7 : 6; return `(${digits.slice(0, 2)})${digits.slice(2, split)}-${digits.slice(split)}` }
 function validPhone(value: string) { const length = value.replace(/\D/g, '').length; return length === 10 || length === 11 }
