@@ -1,0 +1,24 @@
+.professional-overview { display: grid; gap: 18px; margin-top: 20px; }
+.overview-session-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+.overview-session-cards .dashboard-card strong { font-family: inherit; font-size: 20px; font-weight: 700; line-height: 1.3; }
+.overview-pending-list { background: #fff; border: 1px solid #e2e5df; border-radius: 14px; padding: 22px; }
+.overview-pending-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.overview-pending-head h2 { font: 500 22px Georgia, serif; margin: 5px 0 12px; }
+.overview-pending-head small, .overview-pending-list p { color: #77827e; }
+.overview-pending-list > button { width: 100%; display: grid; grid-template-columns: 1fr 1.2fr auto; gap: 12px; align-items: center; border: 0; border-top: 1px solid #edf0eb; background: transparent; padding: 12px 0; text-align: left; color: #294840; }
+.overview-pending-list > button:hover { background: #f5faf7; }
+.overview-pending-list > button span { color: #73807b; font-size: 12px; }
+.overview-pending-list > button b { color: #257064; font-size: 12px; }
+.overview-pending-footer { border-top: 1px solid #edf0eb; padding-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #77827e; font-size: 12px; }
+.overview-session-details dl { display: grid; gap: 12px; margin: 20px 0; }
+.overview-session-details dl > div { display: grid; grid-template-columns: 110px 1fr; gap: 12px; }
+.overview-session-details dt { color: #73807b; font-size: 13px; }
+.overview-session-details dd { margin: 0; overflow-wrap: anywhere; }
+.overview-status-form { display: grid; gap: 17px; margin-top: 20px; }
+.overview-status-form p { margin: 0; line-height: 1.6; }
+.overview-status-form p span { color: #73807b; font-size: 13px; }
+.overview-status-form label { display: grid; gap: 7px; font-size: 13px; font-weight: 700; color: #374540; }
+.overview-status-form label small { font-weight: 400; color: #77827e; }
+.overview-status-form input, .overview-status-form select { border: 1px solid #d7ddd9; border-radius: 9px; padding: 12px 13px; background: #fff; color: #1c2c28; }
+@media (max-width: 1100px) { .overview-session-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 800px) { .overview-session-cards { grid-template-columns: 1fr; } .overview-pending-list > button { grid-template-columns: 1fr; gap: 3px; } }

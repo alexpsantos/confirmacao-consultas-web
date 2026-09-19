@@ -1,7 +1,7 @@
 export const API_URL=import.meta.env.VITE_API_URL??'http://localhost:8080'
 export type Role='ADMIN'|'PROFESSIONAL'
 export type Session={accessToken:string;userId:string;professionalId:string|null;name:string;role:Role}
-export type Professional={id:string;fullName:string;email:string;phone:string|null;registrationNumber:string|null;active:boolean}
+export type Professional={id:string;fullName:string;email:string;phone:string|null;registrationNumber:string|null;specialty:string|null;displayName:string|null;timezone:string;defaultSessionMinutes:number;defaultModality:'PRESENTIAL'|'ONLINE';remindersEnabled:boolean;active:boolean}
 export type Patient={id:string;professionalId:string;professionalName:string;professionalEmail:string;professionalRegistrationNumber:string|null;fullName:string;birthDate:string|null;phone:string;email:string|null;preferredChannel:'WHATSAPP'|'EMAIL';consentStatus:'PENDING'|'GRANTED'|'REVOKED';active:boolean}
 export type Appointment={id:string;patientId:string;patientName:string;startsAt:string;endsAt:string;modality:'PRESENTIAL'|'ONLINE';status:'SCHEDULED'|'CONFIRMED'|'COMPLETED'|'CANCELED'|'NO_SHOW';meetingLink:string|null;notes:string|null}
 export type User={id:string;professionalId:string|null;name:string;email:string;role:Role;active:boolean}

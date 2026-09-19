@@ -4,9 +4,11 @@ import { api, type Patient, type Professional, type Session } from './api'
 
 type CommonProps = { session: Session; reload: () => Promise<void> }
 
-export function AdminProfessionals({ data, session, reload }: CommonProps & { data: Professional[] }) {
+export function AdminProfessionals({ data, patients, session, reload }: CommonProps & { data: Professional[]; patients: Patient[] }) {
   const [editing, setEditing] = useState<Professional | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const selected = data.find(item => item.id === selectedId)
   const [search, setSearch] = useState(''), [status, setStatus] = useState(''), [sort, setSort] = useState('name'), [page, setPage] = useState(0)
   const pageSize = 10
   const filtered = useMemo(() => data.filter(item => {
@@ -18,22 +20,36 @@ export function AdminProfessionals({ data, session, reload }: CommonProps & { da
   const visible = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize)
   const hasFilters = Boolean(search || status || sort !== 'name')
   function clearFilters() { setSearch(''); setStatus(''); setSort('name'); setPage(0) }
+  async function toggle(item: Professional) {
+    if (item.active && !window.confirm(`Deseja desativar ${item.fullName}? O acesso ao sistema será bloqueado.`)) return
+    try { setError(''); await api.adminToggleProfessional(session, item); await reload() } catch (e) { setError(message(e)) }
+  }
+  if (selected) {
+    const owned = patients.filter(patient => patient.professionalId === selected.id)
+    return <section className="admin-professional-detail">
+      <button className="back-link" onClick={() => setSelectedId(null)}>‹ Voltar para profissionais</button>
+      <div className="admin-professional-head"><div><span className="eyebrow">PROFISSIONAL</span><h2>{selected.fullName} <span className={'badge ' + (selected.active ? 'ativo' : 'inativo')}>{selected.active ? 'Ativo' : 'Inativo'}</span></h2><p>{selected.email}</p></div><div className="admin-professional-actions"><button className="ghost" onClick={() => setEditing(selected)}>Editar dados</button><button className="ghost" onClick={() => void toggle(selected)}>{selected.active ? 'Desativar' : 'Ativar'}</button></div></div>
+      {error && <div className="error banner">{error}</div>}
+      <div className="admin-professional-summary"><article><small>Pacientes na listagem</small><strong>{owned.length}</strong><span>{owned.filter(patient => patient.active).length} ativos · {owned.filter(patient => !patient.active).length} inativos</span></article><article><small>Status do acesso</small><strong>{selected.active ? 'Ativo' : 'Inativo'}</strong><span>{selected.active ? 'Pode acessar a plataforma' : 'Acesso bloqueado'}</span></article></div>
+      <div className="admin-professional-data"><h3>Dados profissionais</h3><dl><div><dt>Nome completo</dt><dd>{selected.fullName}</dd></div><div><dt>E-mail</dt><dd>{selected.email}</dd></div><div><dt>Telefone</dt><dd>{selected.phone ? formatPhone(selected.phone) : '—'}</dd></div><div><dt>Registro profissional</dt><dd>{selected.registrationNumber || '—'}</dd></div><div><dt>Profissão ou especialidade</dt><dd>{selected.specialty || '—'}</dd></div></dl></div>
+      {editing && <ProfessionalEditor item={selected} close={() => setEditing(null)} save={async values => { await api.adminUpdateProfessional(session, selected, values); setEditing(null); await reload() }} />}
+    </section>
+  }
   return <section className="panel"><div className="panel-title"><div><h2>{filtered.length} {filtered.length === 1 ? 'profissional encontrado' : 'profissionais encontrados'}</h2><p>Consulte e gerencie os profissionais da plataforma.</p></div></div>
     <div className="list-tools professional-list-tools"><div className="search-field"><span aria-hidden="true">⌕</span><input aria-label="Buscar profissionais" placeholder="Buscar por nome, e-mail, telefone ou registro" value={search} onChange={event => { setSearch(event.target.value); setPage(0) }} /></div><select aria-label="Filtrar profissionais por status" value={status} onChange={event => { setStatus(event.target.value); setPage(0) }}><option value="">Todos os status</option><option value="true">Ativos</option><option value="false">Inativos</option></select><select aria-label="Ordenar profissionais" value={sort} onChange={event => { setSort(event.target.value); setPage(0) }}><option value="name">Ordenar por nome</option><option value="status">Ordenar por status</option></select>{hasFilters && <button className="clear-filters" onClick={clearFilters}>Limpar filtros</button>}</div>
-    <table><thead><tr><th>Nome</th><th>Telefone</th><th>Registro</th><th>Status</th><th /></tr></thead>
-      <tbody>{visible.map(item => <tr key={item.id} className={item.active ? '' : 'inactive-row'}><td><strong>{item.fullName}</strong><small>{item.email}</small></td>
+    <table><thead><tr><th>Nome</th><th>Telefone</th><th>Registro</th><th>Status</th></tr></thead>
+      <tbody>{visible.map(item => <tr key={item.id} className={`admin-professional-row ${item.active ? '' : 'inactive-row'}`} onClick={() => setSelectedId(item.id)}><td><button className="entity-link" onClick={() => setSelectedId(item.id)}>{item.fullName}</button><small>{item.email}</small></td>
         <td>{item.phone ? formatPhone(item.phone) : '—'}</td><td>{item.registrationNumber || '—'}</td>
-        <td><span className={"badge " + (item.active ? 'ativo' : 'inativo')}>{item.active ? 'Ativo' : 'Inativo'}</span></td>
-        <td className="row-actions"><button className="link" onClick={() => setEditing(item)}>Editar</button>
-          <button className="link" onClick={async () => { if (item.active && !window.confirm(`Deseja desativar ${item.fullName}? O acesso ao sistema será bloqueado.`)) return; try { await api.adminToggleProfessional(session, item); await reload() } catch (e) { setError(message(e)) } }}>{item.active ? 'Desativar' : 'Ativar'}</button></td></tr>)}</tbody>
+        <td><span className={"badge " + (item.active ? 'ativo' : 'inativo')}>{item.active ? 'Ativo' : 'Inativo'}</span></td></tr>)}</tbody>
     </table>{!visible.length && <div className="empty">Nenhum profissional encontrado.</div>}{pages > 1 && <div className="pagination"><span>Exibindo {safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div><button className="ghost" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>Anterior</button><span>Página {safePage + 1} de {pages}</span><button className="ghost" disabled={safePage >= pages - 1} onClick={() => setPage(safePage + 1)}>Próxima</button></div></div>}{error && <div className="error banner">{error}</div>}
-    {editing && <ProfessionalEditor item={editing} close={() => setEditing(null)} save={async data => { await api.adminUpdateProfessional(session, editing, data); setEditing(null); await reload() }} />}
   </section>
 }
 
 export function AdminPatients({ data, session, reload, initialConsent = '' }: CommonProps & { data: Patient[]; initialConsent?: string }) {
   const [editing, setEditing] = useState<Patient | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const selected = data.find(item => item.id === selectedId)
   const [professionals, setProfessionals] = useState<Professional[]>([])
   const [search, setSearch] = useState(''), [professional, setProfessional] = useState('')
   const [status, setStatus] = useState(''), [consent, setConsent] = useState(initialConsent)
@@ -63,6 +79,17 @@ export function AdminPatients({ data, session, reload, initialConsent = '' }: Co
   const hasFilters = Boolean(search || professional || status || consent || sort !== 'patient')
   function change(setter: (value: string) => void, value: string) { setter(value); setPage(0) }
   function clearFilters() { setSearch(''); setProfessional(''); setStatus(''); setConsent(''); setSort('patient'); setPage(0) }
+  async function toggle(item: Patient) {
+    if (item.active && !window.confirm(`Deseja desativar ${item.fullName}? O cadastro e o histórico serão preservados.`)) return
+    try { setError(''); await api.adminTogglePatient(session, item); await reload() } catch (e) { setError(message(e)) }
+  }
+  if (selected) return <section className="admin-professional-detail">
+    <button className="back-link" onClick={() => setSelectedId(null)}>‹ Voltar para pacientes</button>
+    <div className="admin-professional-head"><div><span className="eyebrow">PACIENTE</span><h2>{selected.fullName} <span className={'badge ' + (selected.active ? 'ativo' : 'inativo')}>{selected.active ? 'Ativo' : 'Inativo'}</span></h2><p>Profissional responsável: {selected.professionalName}</p></div><div className="admin-professional-actions"><button className="ghost" onClick={() => setEditing(selected)} disabled={!selected.active}>Editar dados</button><button className="ghost" onClick={() => void toggle(selected)}>{selected.active ? 'Desativar' : 'Ativar'}</button></div></div>
+    {error && <div className="error banner">{error}</div>}
+    <div className="admin-professional-data"><h3>Dados cadastrais</h3><dl><div><dt>Nome completo</dt><dd>{selected.fullName}</dd></div><div><dt>E-mail</dt><dd>{selected.email || '—'}</dd></div><div><dt>Telefone</dt><dd>{formatPhone(selected.phone)}</dd></div><div><dt>Data de nascimento</dt><dd>{selected.birthDate ? new Intl.DateTimeFormat('pt-BR', {timeZone:'UTC'}).format(new Date(`${selected.birthDate}T00:00:00Z`)) : '—'}</dd></div><div><dt>Canal preferencial</dt><dd>{selected.preferredChannel === 'WHATSAPP' ? 'WhatsApp' : 'E-mail'}</dd></div><div><dt>Consentimento</dt><dd>{consentLabel(selected.consentStatus)}</dd></div><div><dt>Profissional responsável</dt><dd>{selected.professionalName} · {selected.professionalEmail}</dd></div></dl></div>
+    {editing && <PatientEditor item={selected} close={() => setEditing(null)} save={async values => { await api.adminUpdatePatient(session, selected, values); setEditing(null); await reload() }} />}
+  </section>
   return <section className="panel"><div className="panel-title"><div><h2>{filtered.length} {filtered.length === 1 ? 'paciente encontrado' : 'pacientes encontrados'}</h2><p>Consulte e gerencie os pacientes da plataforma.</p></div></div>
     <div className="list-tools">
       <div className="search-field"><span aria-hidden="true">⌕</span><input aria-label="Buscar pacientes" placeholder="Buscar por nome, e-mail, telefone ou profissional" value={search} onChange={event => change(setSearch, event.target.value)} /></div>
@@ -73,10 +100,10 @@ export function AdminPatients({ data, session, reload, initialConsent = '' }: Co
       {hasFilters && <button className="clear-filters" onClick={clearFilters}>Limpar filtros</button>}
     </div>
     <table><thead><tr><th>Paciente</th><th>Profissional responsável</th><th>Telefone</th><th>Consentimento</th><th>Status</th><th /></tr></thead>
-      <tbody>{visible.map(item => <tr key={item.id} className={item.active ? '' : 'inactive-row'}><td><button className="entity-link" onClick={() => setEditing(item)}>{item.fullName}</button><small>{item.email}</small></td>
+      <tbody>{visible.map(item => <tr key={item.id} className={`admin-professional-row ${item.active ? '' : 'inactive-row'}`} onClick={() => setSelectedId(item.id)}><td><button className="entity-link" onClick={() => setSelectedId(item.id)}>{item.fullName}</button><small>{item.email}</small></td>
         <td><strong>{item.professionalName}</strong><small>{item.professionalEmail}</small>{item.professionalRegistrationNumber && <small>Registro: {item.professionalRegistrationNumber}</small>}</td><td>{formatPhone(item.phone)}{!validPhone(item.phone) && <small className="data-warning">⚠ Telefone inválido</small>}</td><td><span className={'badge ' + item.consentStatus.toLowerCase()}>{consentLabel(item.consentStatus)}</span></td>
         <td><span className={"badge " + (item.active ? 'ativo' : 'inativo')}>{item.active ? 'Ativo' : 'Inativo'}</span></td>
-        <td className="row-actions">{item.active && <button className="link" onClick={() => setEditing(item)}>Editar</button>}<button className="link" onClick={async () => { if (item.active && !window.confirm(`Deseja desativar ${item.fullName}? O cadastro e o histórico serão preservados.`)) return; try { await api.adminTogglePatient(session, item); await reload() } catch (e) { setError(message(e)) } }}>{item.active ? 'Desativar' : 'Ativar'}</button></td></tr>)}</tbody>
+        <td className="row-actions">{item.active && <button className="link" onClick={event => { event.stopPropagation(); setEditing(item) }}>Editar</button>}<button className="link" onClick={event => { event.stopPropagation(); void toggle(item) }}>{item.active ? 'Desativar' : 'Ativar'}</button></td></tr>)}</tbody>
     </table>{!visible.length && <div className="empty">{professional && !data.some(item => item.professionalId === professional) ? 'Este profissional ainda não possui pacientes.' : 'Nenhum paciente encontrado.'}</div>}
     {pages > 1 && <div className="pagination"><span>Exibindo {safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div><button className="ghost" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>Anterior</button><span>Página {safePage + 1} de {pages}</span><button className="ghost" disabled={safePage >= pages - 1} onClick={() => setPage(safePage + 1)}>Próxima</button></div></div>}
     {error && <div className="error banner">{error}</div>}
@@ -85,11 +112,12 @@ export function AdminPatients({ data, session, reload, initialConsent = '' }: Co
 }
 
 function ProfessionalEditor({ item, close, save }: { item: Professional; close: () => void; save: (data: object) => Promise<void> }) {
-  return <Editor title="Editar profissional" close={close} submit={async form => save({ fullName: form.get('fullName'), email: form.get('email'), phone: form.get('phone') || null, registrationNumber: form.get('registrationNumber') || null })}>
+  return <Editor title="Editar profissional" close={close} submit={async form => save({ fullName: form.get('fullName'), email: form.get('email'), phone: form.get('phone') || null, registrationNumber: form.get('registrationNumber') || null, specialty: form.get('specialty') || null })}>
     <label className="span">Nome completo<input name="fullName" defaultValue={item.fullName} required maxLength={150} /></label>
     <label>E-mail<input name="email" type="email" defaultValue={item.email} required maxLength={254} pattern="[^\s@]+@[^\s@]+\.[^\s@]+" /></label>
     <label>Telefone<input name="phone" defaultValue={item.phone ?? ''} required maxLength={20} inputMode="tel" /></label>
     <label className="span">Registro profissional<input name="registrationNumber" defaultValue={item.registrationNumber ?? ''} maxLength={50} /></label>
+    <label className="span">Profissão ou especialidade<input name="specialty" defaultValue={item.specialty ?? ''} maxLength={100} /></label>
   </Editor>
 }
 

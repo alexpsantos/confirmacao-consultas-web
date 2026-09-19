@@ -15,6 +15,12 @@ const professional: Professional = {
   email: 'profissional@email.com',
   phone: null,
   registrationNumber: null,
+  specialty: null,
+  displayName: null,
+  timezone: 'America/Sao_Paulo',
+  defaultSessionMinutes: 60,
+  defaultModality: 'PRESENTIAL',
+  remindersEnabled: true,
   active: true,
 }
 
