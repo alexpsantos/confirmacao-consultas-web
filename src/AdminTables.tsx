@@ -93,13 +93,17 @@ function ProfessionalEditor({ item, close, save }: { item: Professional; close: 
   </Editor>
 }
 
-export function PatientEditor({ item, close, save }: { item: Patient; close: () => void; save: (data: object) => Promise<void> }) {
+export function PatientEditor({ item, close, save, changeConsent, toggleActive }: { item: Patient; close: () => void; save: (data: object) => Promise<void>; changeConsent?: () => Promise<void>; toggleActive?: () => Promise<void> }) {
+  const [consentBusy, setConsentBusy] = useState(false)
+  if (!item.active) return <div className="modal-backdrop"><section className="modal"><div className="modal-head"><h2>Paciente inativo</h2><button onClick={close}>×</button></div><div className="inactive-editor"><p>Dados disponíveis somente para consulta. Ative o paciente para editar informações ou alterar o consentimento.</p><div className="patient-readonly"><div><small>Nome completo</small><strong>{item.fullName}</strong></div><div><small>E-mail</small><strong>{item.email || '—'}</strong></div><div><small>Telefone</small><strong>{formatPhone(item.phone)}</strong></div><div><small>Data de nascimento</small><strong>{item.birthDate ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(new Date(`${item.birthDate}T00:00:00Z`)) : '—'}</strong></div><div><small>Canal preferencial</small><strong>{item.preferredChannel === 'WHATSAPP' ? 'WhatsApp' : 'E-mail'}</strong></div><div><small>Consentimento</small><strong>{consentLabel(item.consentStatus)}</strong></div></div><div className="form-actions"><button type="button" className="ghost" onClick={close}>Fechar</button>{toggleActive && <button className="primary" onClick={async () => { await toggleActive() }}>Ativar paciente</button>}</div></div></section></div>
   return <Editor title="Editar paciente" close={close} submit={async form => save({ fullName: form.get('fullName'), birthDate: form.get('birthDate') || null, phone: form.get('phone'), email: form.get('email') || null, preferredChannel: form.get('preferredChannel') })}>
     <label className="span">Nome completo<input name="fullName" defaultValue={item.fullName} required maxLength={150} /></label>
     <label>Data de nascimento<input name="birthDate" type="date" min="1900-01-01" max={new Date().toISOString().slice(0, 10)} defaultValue={item.birthDate ?? ''} /></label>
     <label>Telefone<input name="phone" defaultValue={formatPhone(item.phone)} required minLength={13} maxLength={14} inputMode="numeric" pattern="\(\d{2}\)\d{4,5}-\d{4}" title="Informe um telefone com DDD" placeholder="(11)12345-6789" onInput={event => { event.currentTarget.value = formatPhoneInput(event.currentTarget.value) }} /></label>
     <label>E-mail<input name="email" type="email" defaultValue={item.email ?? ''} maxLength={254} pattern="[^\s@]+@[^\s@]+\.[^\s@]+" /></label>
     <label>Canal preferencial<select name="preferredChannel" defaultValue={item.preferredChannel}><option>WHATSAPP</option><option>EMAIL</option></select></label>
+    {changeConsent && item.active && <div className="consent-edit span"><div><strong>Consentimento</strong><small>Status atual: {consentLabel(item.consentStatus)}</small></div><button type="button" className="link" disabled={consentBusy} onClick={async () => { setConsentBusy(true); try { await changeConsent() } finally { setConsentBusy(false) } }}>{consentBusy ? 'Salvando…' : item.consentStatus === 'GRANTED' ? 'Revogar consentimento' : 'Conceder consentimento'}</button></div>}
+    {toggleActive && <div className="form-actions span"><button type="button" className="link danger-link" onClick={async () => { if (window.confirm(`Deseja desativar ${item.fullName}? O cadastro e o histórico serão preservados.`)) await toggleActive() }}>Desativar paciente</button></div>}
   </Editor>
 }
 
