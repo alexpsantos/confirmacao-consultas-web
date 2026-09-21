@@ -26,17 +26,17 @@ describe('consulta administrativa de usuários', () => {
   })
 })
 
-describe('filtro administrativo vindo do painel', () => {
-  it('abre a lista mostrando somente consentimentos pendentes', () => {
+describe('lista administrativa de pacientes', () => {
+  it('mostra todos os pacientes sem destacar consentimentos', () => {
     const session: Session = { accessToken: 'token', userId: 'admin', professionalId: null, name: 'Admin', role: 'ADMIN' }
     const base = { professionalId: 'professional', professionalName: 'Profissional', professionalEmail: 'pro@email.com', professionalRegistrationNumber: null, birthDate: null, phone: '11999999999', email: null, preferredChannel: 'WHATSAPP' as const, consentedAt: null, active: true, createdAt: '', updatedAt: '' }
     const patients: Patient[] = [
       { ...base, id: 'pending', fullName: 'Paciente pendente', consentStatus: 'PENDING' },
       { ...base, id: 'granted', fullName: 'Paciente concedido', consentStatus: 'GRANTED' },
     ]
-    const html = renderToStaticMarkup(<AdminPatients data={patients} session={session} reload={vi.fn()} initialConsent="PENDING" />)
+    const html = renderToStaticMarkup(<AdminPatients data={patients} session={session} reload={vi.fn()} />)
     expect(html).toContain('Paciente pendente')
-    expect(html).not.toContain('Paciente concedido')
-    expect(html).toContain('<option value="PENDING" selected="">Pendente</option>')
+    expect(html).toContain('Paciente concedido')
+    expect(html).not.toContain('Filtrar por consentimento')
   })
 })

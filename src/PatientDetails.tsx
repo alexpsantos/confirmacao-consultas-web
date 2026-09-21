@@ -135,17 +135,6 @@ export function PatientDetails({
           value={completed[0] ? date(completed[0].startsAt) : "—"}
           detail={completed[0] ? "Realizada" : "Nenhuma realizada"}
         />
-        <Stat
-          label="Consentimento"
-          value={
-            patient.consentStatus === "GRANTED"
-              ? "Concedido"
-              : patient.consentStatus === "REVOKED"
-                ? "Revogado"
-                : "Pendente"
-          }
-          detail="status atual"
-        />
       </div>
       <div className="patient-session-grid">
         <SessionList

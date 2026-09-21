@@ -111,7 +111,7 @@ function Auth({ done }: { done: (s: Session) => void }) {
         <div className="brand-copy">
           <span className="eyebrow">CONFIRMA</span>
           <h1>Seu atendimento, organizado.</h1>
-          <p>Gerencie pacientes e consentimentos em um único lugar.</p>
+          <p>Gerencie pacientes e sessões em um único lugar.</p>
         </div>
         <small>Privacidade e simplicidade para o seu dia a dia.</small>
       </section>
@@ -208,7 +208,6 @@ function Dashboard({
     [error, setError] = useState(""),
     [modal, setModal] = useState(false),
     [changePassword, setChangePassword] = useState(false),
-    [patientConsentFilter, setPatientConsentFilter] = useState(""),
     [loginFailuresLast7Days, setLoginFailuresLast7Days] = useState(0),
     [selectedPatient, setSelectedPatient] = useState<Patient | null>(null),
     [editingPatient, setEditingPatient] = useState<Patient | null>(null),
@@ -278,7 +277,6 @@ function Dashboard({
                 text="Pacientes"
                 active={view === "patients" || view === "patient-detail"}
                 go={() => {
-                  setPatientConsentFilter("");
                   setView("patients");
                 }}
               />
@@ -309,7 +307,6 @@ function Dashboard({
                 text="Pacientes"
                 active={view === "patients" || view === "patient-detail"}
                 go={() => {
-                  setPatientConsentFilter("");
                   setView("patients");
                 }}
               />
@@ -354,8 +351,7 @@ function Dashboard({
             loginFailuresLast7Days={loginFailuresLast7Days}
             go={setView}
             openPatient={(patient) => { setSelectedPatient(patient); setView("patient-detail") }}
-            openPatients={(consent) => {
-              setPatientConsentFilter(consent);
+            openPatients={() => {
               setView("patients");
             }}
           />
@@ -370,19 +366,15 @@ function Dashboard({
         {view === "patients" &&
           (admin ? (
             <AdminPatients
-              key={patientConsentFilter || "all"}
               data={patients}
               session={session}
               reload={load}
-              initialConsent={patientConsentFilter}
             />
           ) : (
             <Patients
-              key={patientConsentFilter || "all"}
               data={patients}
               canEdit
               reload={load}
-              initialConsent={patientConsentFilter}
               add={() => setModal(true)}
               toggle={async (p) => {
                 await api.togglePatient(session, p);
@@ -424,12 +416,6 @@ function Dashboard({
           close={() => setEditingPatient(null)}
           save={async (data) => {
             const updated = await api.updatePatient(session, editingPatient, data);
-            setSelectedPatient(updated);
-            setEditingPatient(null);
-            await load();
-          }}
-          changeConsent={async () => {
-            const updated = await api.setConsent(session, editingPatient, editingPatient.consentStatus !== "GRANTED");
             setSelectedPatient(updated);
             setEditingPatient(null);
             await load();
@@ -500,14 +486,13 @@ function Overview({
   loginFailuresLast7Days: number;
   go: (view: View) => void;
   openPatient: (patient: Patient) => void;
-  openPatients: (consent: string) => void;
+  openPatients: () => void;
 }) {
-  const pending = patients.filter((p) => p.consentStatus === "PENDING").length,
-    inactiveProfessionals = professionals.filter((p) => !p.active).length,
+  const inactiveProfessionals = professionals.filter((p) => !p.active).length,
     inactivePatients = patients.filter((p) => !p.active).length;
   return (
     <>
-      {admin && <section className="stats four">
+      {admin && <section className="stats">
         <Card
           label="Profissionais"
           value={professionals.length}
@@ -518,41 +503,22 @@ function Overview({
           label="Pacientes"
           value={patients.length}
           detail={`${patients.filter((p) => p.active).length} ativos · ${inactivePatients} inativos`}
-          go={() => openPatients("")}
+          go={openPatients}
         />
         <Card
-          label={admin ? "Usuários" : "Consentimentos concedidos"}
-          value={
-            admin
-              ? users.length
-              : patients.filter((p) => p.consentStatus === "GRANTED").length
-          }
-          detail={
-            admin
-              ? `${users.filter((u) => u.active).length} acessos ativos`
-              : "dos seus pacientes"
-          }
-          go={() => (admin ? go("users") : openPatients("GRANTED"))}
-        />
-        <Card
-          label="Consentimentos pendentes"
-          value={pending}
-          detail={pending ? "requerem atenção" : "nenhuma pendência"}
-          go={() => openPatients("PENDING")}
+          label="Usuários"
+          value={users.length}
+          detail={`${users.filter((u) => u.active).length} acessos ativos`}
+          go={() => go("users")}
         />
       </section>}
-      {!admin && <ProfessionalOverview session={session} patients={patients} consentPending={pending} openPatient={openPatient} openPatients={() => openPatients("PENDING")} go={() => go("sessions")} />}
+      {!admin && <ProfessionalOverview session={session} patients={patients} openPatient={openPatient} go={() => go("sessions")} />}
       {admin && <section className="overview-grid">
         <article className="welcome operational">
           <div>
             <span className="eyebrow">ATENÇÃO</span>
             <h2>Resumo operacional</h2>
             <ul>
-              <li>
-                <button onClick={() => openPatients("PENDING")}>
-                  {pending} consentimento(s) pendente(s)
-                </button>
-              </li>
               {admin && (
                 <>
                   <li>
@@ -591,12 +557,10 @@ function Overview({
     </>
   );
 }
-function ProfessionalOverview({ session, patients, consentPending, openPatient, openPatients, go }: {
+function ProfessionalOverview({ session, patients, openPatient, go }: {
   session: Session;
   patients: Patient[];
-  consentPending: number;
   openPatient: (patient: Patient) => void;
-  openPatients: () => void;
   go: () => void;
 }) {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -628,8 +592,13 @@ function ProfessionalOverview({ session, patients, consentPending, openPatient, 
     .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
   const next = upcoming[0];
   const today = new Date().toDateString();
-  const todayCount = appointments.filter(item => item.status !== "CANCELED" && new Date(item.startsAt).toDateString() === today).length;
-  const todayCompleted = appointments.filter(item => item.status === "COMPLETED" && new Date(item.startsAt).toDateString() === today).length;
+  const todaySessions = appointments.filter(item => new Date(item.startsAt).toDateString() === today);
+  const todayCompleted = todaySessions.filter(item => item.status === "COMPLETED").length;
+  const todayCanceled = todaySessions.filter(item => item.status === "CANCELED").length;
+  const todayUpcoming = todaySessions.filter(item => (item.status === "SCHEDULED" || item.status === "CONFIRMED") && new Date(item.startsAt).getTime() > now).length;
+  const todayNoShow = todaySessions.filter(item => item.status === "NO_SHOW").length;
+  const todayPending = todaySessions.filter(item => (item.status === "SCHEDULED" || item.status === "CONFIRMED") && new Date(item.endsAt).getTime() <= now).length;
+  const todayInProgress = todaySessions.filter(item => (item.status === "SCHEDULED" || item.status === "CONFIRMED") && new Date(item.startsAt).getTime() <= now && new Date(item.endsAt).getTime() > now).length;
   const dateTime = (value: string) => new Date(value).toLocaleString("pt-BR", { dateStyle: "medium", timeStyle: "short" });
   async function updatePendingStatus(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -648,11 +617,19 @@ function ProfessionalOverview({ session, patients, consentPending, openPatient, 
     finally { setUpdatingPending(false); }
   }
   return <section className="professional-overview">
+    <button className="overview-today-summary" onClick={go} aria-label="Abrir agenda das sessões de hoje">
+      <span className="eyebrow">AGENDA DE HOJE</span>
+      <div className="overview-today-stats">
+        <div><small>Total no dia</small><strong>{loading ? "—" : todaySessions.length}</strong></div>
+        <div><small>Realizadas</small><strong>{loading ? "—" : todayCompleted}</strong></div>
+        <div><small>Canceladas</small><strong>{loading ? "—" : todayCanceled}</strong></div>
+        <div><small>Ainda por atender</small><strong>{loading ? "—" : todayUpcoming}</strong></div>
+      </div>
+      {!loading && (todayNoShow > 0 || todayPending > 0 || todayInProgress > 0) && <small className="overview-today-extra">{[todayNoShow > 0 && `${todayNoShow} não compareceu`, todayPending > 0 && `${todayPending} aguardando resultado`, todayInProgress > 0 && `${todayInProgress} em andamento`].filter(Boolean).join(" · ")}</small>}
+    </button>
     <div className="overview-session-cards">
-      <button className="dashboard-card" onClick={go}><span>Sessões de hoje</span><strong>{loading ? "—" : todayCount}</strong><small>{loading ? "Carregando…" : `${todayCompleted} realizada(s)`}</small></button>
       <button className="dashboard-card" onClick={go}><span>Próxima sessão</span><strong>{next ? dateTime(next.startsAt) : "—"}</strong><small>{next ? next.patientName : loading ? "Carregando…" : "Nenhuma sessão agendada"}</small></button>
       <article className="dashboard-card"><span>Status a atualizar</span><strong>{loading ? "—" : pending.length}</strong><small>sessões passadas nos últimos 90 dias</small></article>
-      <button className="dashboard-card" onClick={openPatients}><span>Consentimentos pendentes</span><strong>{consentPending}</strong><small>{consentPending ? "requerem atenção" : "nenhuma pendência"}</small></button>
     </div>
     {error && <div className="error banner">{error}</div>}
     <article className="overview-pending-list"><div className="overview-pending-head"><div><span className="eyebrow">ACOMPANHAMENTO</span><h2>Atualizar resultado das sessões</h2></div><small>{pending.length} pendente(s)</small></div>
@@ -916,7 +893,6 @@ function Patients({
   add,
   toggle,
   reload,
-  initialConsent,
   open,
 }: {
   data: Patient[];
@@ -924,13 +900,11 @@ function Patients({
   add: () => void;
   toggle: (p: Patient) => void | Promise<void>;
   reload: () => Promise<void>;
-  initialConsent: string;
   open: (patient: Patient) => void;
 }) {
   const [editing, setEditing] = useState<Patient | null>(null),
     [search, setSearch] = useState(""),
     [status, setStatus] = useState(""),
-    [consent, setConsent] = useState(initialConsent),
     [sort, setSort] = useState("name"),
     [page, setPage] = useState(0),
     currentSession = readSession(),
@@ -943,8 +917,7 @@ function Patients({
             [p.fullName, p.email, p.phone].some((value) =>
               value?.toLocaleLowerCase("pt-BR").includes(term),
             )) &&
-          (!status || String(p.active) === status) &&
-          (!consent || p.consentStatus === consent)
+          (!status || String(p.active) === status)
         );
       })
       .sort((a, b) =>
@@ -991,16 +964,6 @@ function Patients({
           <option value="false">Inativos</option>
         </select>
         <select
-          aria-label="Filtrar por consentimento"
-          value={consent}
-          onChange={(event) => change(setConsent, event.target.value)}
-        >
-          <option value="">Todos os consentimentos</option>
-          <option value="PENDING">Pendente</option>
-          <option value="GRANTED">Concedido</option>
-          <option value="REVOKED">Revogado</option>
-        </select>
-        <select
           aria-label="Ordenar pacientes"
           value={sort}
           onChange={(event) => {
@@ -1017,7 +980,6 @@ function Patients({
           <tr>
             <th>Paciente</th>
             <th>Telefone</th>
-            <th>Consentimento</th>
             <th>Status</th><th aria-label="Abrir paciente" />
           </tr>
         </thead>
@@ -1033,9 +995,6 @@ function Patients({
                 <small>{p.email}</small>
               </td>
               <td>{formatPatientPhoneInput(p.phone)}</td>
-              <td>
-                <Badge v={p.consentStatus} />
-              </td>
               <td>
                 <Badge v={p.active ? "Ativo" : "Inativo"} />
               </td>
@@ -1077,15 +1036,6 @@ function Patients({
           close={() => setEditing(null)}
           save={async (d) => {
             await api.updatePatient(currentSession, editing, d);
-            setEditing(null);
-            await refresh();
-          }}
-          changeConsent={async () => {
-            await api.setConsent(
-              currentSession,
-              editing,
-              editing.consentStatus !== "GRANTED",
-            );
             setEditing(null);
             await refresh();
           }}
@@ -1238,6 +1188,7 @@ function PatientModal({
                 phone: f.get("phone"),
                 email: f.get("email") || null,
                 preferredChannel: f.get("channel"),
+                whatsappRemindersEnabled: f.has("whatsappRemindersEnabled"),
               });
             } catch (x) {
               setError(x instanceof Error ? x.message : "Falha ao salvar");
@@ -1292,6 +1243,7 @@ function PatientModal({
               <option>EMAIL</option>
             </select>
           </label>
+          <label className="span reminder-option"><input type="checkbox" name="whatsappRemindersEnabled" defaultChecked /> Lembretes via WhatsApp</label>
           {error && <div className="error span">{error}</div>}
           <div className="form-actions span">
             <button type="button" className="ghost" onClick={close}>
