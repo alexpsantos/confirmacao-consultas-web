@@ -20,6 +20,23 @@ import "./App.css";
 import "./Profile.css";
 import "./OverviewSessions.css";
 const STORAGE = "confirma.session.v2";
+const TIMEZONES = [
+  ["America/Noronha", "Fernando de Noronha (UTC-2)"],
+  ["America/Belem", "Belém (UTC-3)"],
+  ["America/Fortaleza", "Fortaleza (UTC-3)"],
+  ["America/Recife", "Recife (UTC-3)"],
+  ["America/Bahia", "Salvador (UTC-3)"],
+  ["America/Sao_Paulo", "Brasília (UTC-3)"],
+  ["America/Campo_Grande", "Campo Grande (UTC-4)"],
+  ["America/Cuiaba", "Cuiabá (UTC-4)"],
+  ["America/Manaus", "Manaus (UTC-4)"],
+  ["America/Porto_Velho", "Porto Velho (UTC-4)"],
+  ["America/Boa_Vista", "Boa Vista (UTC-4)"],
+  ["America/Rio_Branco", "Rio Branco (UTC-5)"],
+] as const;
+function browserTimezone() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo";
+}
 type View =
   | "overview"
   | "profile"
@@ -72,6 +89,7 @@ export default function App() {
 }
 function Auth({ done }: { done: (s: Session) => void }) {
   const [mode, setMode] = useState<"login" | "register" | "forgot">("login"),
+    [authOpen, setAuthOpen] = useState(false),
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
@@ -87,17 +105,20 @@ function Auth({ done }: { done: (s: Session) => void }) {
         setMessage(result.message);
         return;
       }
-      done(
-        mode === "register"
-          ? await api.register({
+      if (mode === "register") {
+        const timezone = String(f.get("timezone") || browserTimezone()),
+          registered = await api.register({
               fullName: f.get("name"),
               email: f.get("email"),
               password: f.get("password"),
               phone: f.get("phone"),
               registrationNumber: f.get("registration") || null,
-            })
-          : await api.login(String(f.get("email")), String(f.get("password"))),
-      );
+              timezone,
+            });
+        done(registered);
+      } else {
+        done(await api.login(String(f.get("email")), String(f.get("password"))));
+      }
     } catch (x) {
       setError(x instanceof Error ? x.message : "Falha na autenticação");
     } finally {
@@ -105,17 +126,74 @@ function Auth({ done }: { done: (s: Session) => void }) {
     }
   }
   return (
-    <main className="login-page">
-      <section className="login-brand">
+    <main className="public-page">
+      <header className="public-header">
         <Logo />
-        <div className="brand-copy">
-          <span className="eyebrow">CONFIRMA</span>
-          <h1>Seu atendimento, organizado.</h1>
-          <p>Gerencie pacientes e sessões em um único lugar.</p>
+        <nav aria-label="Navegação principal">
+          <a href="#recursos">Recursos</a>
+          <a href="#como-funciona">Como funciona</a>
+          <a href="#whatsapp">WhatsApp</a>
+        </nav>
+        <button className="public-login-link" type="button" onClick={() => { setMode("login"); setAuthOpen(true); }}>Entrar</button>
+      </header>
+
+      <section className="public-hero">
+        <div className="public-hero-copy">
+          <span className="eyebrow">AGENDA PARA PROFISSIONAIS</span>
+          <h1>Menos tempo organizando. Mais tempo atendendo.</h1>
+          <p>Centralize pacientes, sessões e confirmações em uma rotina simples, feita para psicólogos, terapeutas e profissionais que trabalham com horário marcado.</p>
+          <div className="public-hero-actions">
+            <button className="primary" type="button" onClick={() => { setMode("register"); setAuthOpen(true); }}>Criar minha conta</button>
+            <a href="#recursos">Conhecer a plataforma</a>
+          </div>
+          <ul className="public-benefits" aria-label="Benefícios">
+            <li>Agenda clara</li><li>Rotina centralizada</li><li>Sem módulos desnecessários</li>
+          </ul>
         </div>
-        <small>Privacidade e simplicidade para o seu dia a dia.</small>
+
+        <div className="product-preview" aria-label="Prévia da plataforma">
+          <div className="preview-top"><span /><span /><span /><b>Agenda de hoje</b></div>
+          <div className="preview-body">
+            <aside><i>C</i><span className="active" /><span /><span /><span /></aside>
+            <div className="preview-content">
+              <small>TERÇA-FEIRA, 22 DE SETEMBRO</small>
+              <h2>Seus próximos atendimentos</h2>
+              <div className="preview-stats"><span><b>6</b> consultas</span><span><b>2</b> realizadas</span><span><b>3</b> a confirmar</span></div>
+              <div className="preview-appointment"><time>09:00</time><div><b>Marina Oliveira</b><small>Online · Confirmada</small></div><em>Confirmada</em></div>
+              <div className="preview-appointment"><time>10:30</time><div><b>Rafael Santos</b><small>Presencial · Aguardando</small></div><em className="waiting">Aguardando</em></div>
+              <div className="preview-appointment"><time>14:00</time><div><b>Carla Mendes</b><small>Online · Confirmada</small></div><em>Confirmada</em></div>
+            </div>
+          </div>
+        </div>
       </section>
-      <section className="login-panel">
+
+      <section className="public-section" id="recursos">
+        <div className="section-heading"><span className="eyebrow">O ESSENCIAL, BEM FEITO</span><h2>Tudo o que você precisa para conduzir o dia</h2><p>Informação importante à vista e poucos cliques para agir.</p></div>
+        <div className="feature-grid">
+          <article><span>01</span><h3>Agenda organizada</h3><p>Visualize o dia e a semana, horários disponíveis e o status de cada sessão.</p></article>
+          <article><span>02</span><h3>Pacientes centralizados</h3><p>Cadastre contatos, preferências de lembrete e consulte o histórico de sessões.</p></article>
+          <article><span>03</span><h3>Pendências visíveis</h3><p>Saiba quais atendimentos ainda precisam ter o resultado atualizado.</p></article>
+        </div>
+      </section>
+
+      <section className="workflow-section" id="como-funciona">
+        <div><span className="eyebrow">ROTINA SIMPLES</span><h2>Da agenda ao acompanhamento, sem complicação.</h2></div>
+        <ol><li><b>Cadastre o paciente</b><span>Guarde somente os dados necessários para o atendimento.</span></li><li><b>Agende a sessão</b><span>Escolha horário, duração e modalidade.</span></li><li><b>Acompanhe o resultado</b><span>Registre se a sessão foi realizada, cancelada ou não houve comparecimento.</span></li></ol>
+      </section>
+
+      <section className="whatsapp-section" id="whatsapp">
+        <div className="whatsapp-mark">WA</div>
+        <div><span className="eyebrow">PRÓXIMO PASSO</span><h2>Confirmações pelo WhatsApp</h2><p>A estrutura de acompanhamento já está preparada. O envio e as respostas automáticas serão disponibilizados com a integração oficial, sem simular mensagens enquanto ela não estiver ativa.</p></div>
+        <span className="coming-soon">Em desenvolvimento</span>
+      </section>
+
+      <section className="public-cta">
+        <div><span className="eyebrow">COMECE AGORA</span><h2>Sua agenda mais tranquila começa aqui.</h2></div>
+        <button className="primary" type="button" onClick={() => { setMode("register"); setAuthOpen(true); }}>Criar minha conta profissional</button>
+      </section>
+      {authOpen && <div className="auth-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setAuthOpen(false); }}>
+        <section className="login-panel auth-modal" role="dialog" aria-modal="true" aria-label={mode === "register" ? "Criar conta" : "Entrar"}>
+        <button className="auth-modal-close" type="button" aria-label="Fechar" onClick={() => setAuthOpen(false)}>×</button>
         <form className="login-card" onSubmit={submit}>
           <span className="mobile-brand">Confirma</span>
           <span className="eyebrow">
@@ -146,6 +224,13 @@ function Auth({ done }: { done: (s: Session) => void }) {
                 Registro profissional (opcional)
                 <input name="registration" maxLength={50} />
               </label>
+              <label>
+                Fuso horário
+                <select name="timezone" defaultValue={browserTimezone()}>
+                  {!TIMEZONES.some(([value]) => value === browserTimezone()) && <option value={browserTimezone()}>{browserTimezone()} (detectado)</option>}
+                  {TIMEZONES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </label>
             </>
           )}
           <label>
@@ -155,7 +240,15 @@ function Auth({ done }: { done: (s: Session) => void }) {
           {mode !== "forgot" && (
             <label>
               Senha
-              <input name="password" type="password" minLength={8} required />
+              <input
+                name="password"
+                type="password"
+                minLength={mode === "register" ? 8 : undefined}
+                maxLength={72}
+                pattern={mode === "register" ? "(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).+" : undefined}
+                title={mode === "register" ? "Use letra maiúscula, minúscula e número" : undefined}
+                required
+              />
             </label>
           )}
           {error && <div className="error">{error}</div>}
@@ -188,7 +281,9 @@ function Auth({ done }: { done: (s: Session) => void }) {
               : "Voltar ao login"}
           </button>
         </form>
-      </section>
+        </section>
+      </div>}
+      <footer className="public-footer"><Logo /><span>Organização e simplicidade para sua rotina profissional.</span></footer>
     </main>
   );
 }
@@ -211,7 +306,8 @@ function Dashboard({
     [loginFailuresLast7Days, setLoginFailuresLast7Days] = useState(0),
     [selectedPatient, setSelectedPatient] = useState<Patient | null>(null),
     [editingPatient, setEditingPatient] = useState<Patient | null>(null),
-    [schedulePatientId, setSchedulePatientId] = useState<string | null>(null);
+    [schedulePatientId, setSchedulePatientId] = useState<string | null>(null),
+    [scheduleNewSession, setScheduleNewSession] = useState(false);
   const load = useCallback(async () => {
     try {
       setError("");
@@ -354,13 +450,15 @@ function Dashboard({
             openPatients={() => {
               setView("patients");
             }}
+            newPatient={() => setModal(true)}
+            newSession={() => { setScheduleNewSession(true); setView("sessions"); }}
           />
         )}{" "}
         {view === "profile" && (
           <Profile item={professionals[0]} session={session} saved={load} />
         )}{" "}
         {view === "sessions" && !admin && (
-          <SessionsView session={session} patients={patients} professional={professionals[0]} initialPatientId={schedulePatientId ?? undefined} onInitialPatientHandled={() => setSchedulePatientId(null)} />
+          <SessionsView session={session} patients={patients} professional={professionals[0]} initialPatientId={schedulePatientId ?? undefined} openNewSession={scheduleNewSession} onInitialPatientHandled={() => { setSchedulePatientId(null); setScheduleNewSession(false); }} />
         )}{" "}
         {view === "patient-detail" && selectedPatient && !admin && <PatientDetails session={session} patient={selectedPatient} back={() => setView("patients")} edit={() => setEditingPatient(selectedPatient)} toggleActive={async () => { await api.togglePatient(session, selectedPatient); setSelectedPatient({...selectedPatient, active: !selectedPatient.active}); await load() }} newSession={() => { setSchedulePatientId(selectedPatient.id); setView("sessions") }} />}{" "}
         {view === "patients" &&
@@ -476,6 +574,8 @@ function Overview({
   go,
   openPatient,
   openPatients,
+  newPatient,
+  newSession,
 }: {
   session: Session;
   admin: boolean;
@@ -487,6 +587,8 @@ function Overview({
   go: (view: View) => void;
   openPatient: (patient: Patient) => void;
   openPatients: () => void;
+  newPatient: () => void;
+  newSession: () => void;
 }) {
   const inactiveProfessionals = professionals.filter((p) => !p.active).length,
     inactivePatients = patients.filter((p) => !p.active).length;
@@ -512,7 +614,7 @@ function Overview({
           go={() => go("users")}
         />
       </section>}
-      {!admin && <ProfessionalOverview session={session} patients={patients} openPatient={openPatient} go={() => go("sessions")} />}
+      {!admin && <ProfessionalOverview session={session} patients={patients} openPatient={openPatient} go={() => go("sessions")} newPatient={newPatient} newSession={newSession} />}
       {admin && <section className="overview-grid">
         <article className="welcome operational">
           <div>
@@ -557,11 +659,13 @@ function Overview({
     </>
   );
 }
-function ProfessionalOverview({ session, patients, openPatient, go }: {
+function ProfessionalOverview({ session, patients, openPatient, go, newPatient, newSession }: {
   session: Session;
   patients: Patient[];
   openPatient: (patient: Patient) => void;
   go: () => void;
+  newPatient: () => void;
+  newSession: () => void;
 }) {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -574,9 +678,8 @@ function ProfessionalOverview({ session, patients, openPatient, go }: {
   const [pendingError, setPendingError] = useState("");
   useEffect(() => {
     let active = true;
-    const start = new Date(), end = new Date();
-    start.setDate(start.getDate() - 90);
-    end.setFullYear(end.getFullYear() + 1);
+    const start = new Date(0), end = new Date();
+    end.setFullYear(end.getFullYear() + 100);
     api.sessions(session, start.toISOString(), end.toISOString())
       .then(items => { if (active) setAppointments(items); })
       .catch(e => { if (active) setError(e instanceof Error ? e.message : "Falha ao carregar as sessões"); })
@@ -590,15 +693,16 @@ function ProfessionalOverview({ session, patients, openPatient, go }: {
   const pending = appointments
     .filter(item => (item.status === "SCHEDULED" || item.status === "CONFIRMED") && new Date(item.endsAt).getTime() < now)
     .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
-  const next = upcoming[0];
   const today = new Date().toDateString();
-  const todaySessions = appointments.filter(item => new Date(item.startsAt).toDateString() === today);
+  const todaySessions = appointments.filter(item => new Date(item.startsAt).toDateString() === today).sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   const todayCompleted = todaySessions.filter(item => item.status === "COMPLETED").length;
   const todayCanceled = todaySessions.filter(item => item.status === "CANCELED").length;
   const todayUpcoming = todaySessions.filter(item => (item.status === "SCHEDULED" || item.status === "CONFIRMED") && new Date(item.startsAt).getTime() > now).length;
   const todayNoShow = todaySessions.filter(item => item.status === "NO_SHOW").length;
   const todayPending = todaySessions.filter(item => (item.status === "SCHEDULED" || item.status === "CONFIRMED") && new Date(item.endsAt).getTime() <= now).length;
   const todayInProgress = todaySessions.filter(item => (item.status === "SCHEDULED" || item.status === "CONFIRMED") && new Date(item.startsAt).getTime() <= now && new Date(item.endsAt).getTime() > now).length;
+  const awaitingConfirmation = upcoming.filter(item => item.status === "SCHEDULED").length;
+  const confirmedUpcoming = upcoming.filter(item => item.status === "CONFIRMED").length;
   const dateTime = (value: string) => new Date(value).toLocaleString("pt-BR", { dateStyle: "medium", timeStyle: "short" });
   async function updatePendingStatus(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -606,9 +710,8 @@ function ProfessionalOverview({ session, patients, openPatient, go }: {
     setUpdatingPending(true); setPendingError("");
     const form = new FormData(event.currentTarget);
     try {
-      const updated = await api.updateSession(session, selectedPending.id, {
-        patientId: selectedPending.patientId, startsAt: selectedPending.startsAt, endsAt: selectedPending.endsAt,
-        modality: selectedPending.modality, status: form.get("status"), meetingLink: selectedPending.meetingLink,
+      const updated = await api.updateSessionResult(session, selectedPending.id, {
+        status: form.get("status"),
         notes: form.get("notes") || null,
       });
       setAppointments(items => items.map(item => item.id === updated.id ? updated : item));
@@ -617,43 +720,47 @@ function ProfessionalOverview({ session, patients, openPatient, go }: {
     finally { setUpdatingPending(false); }
   }
   return <section className="professional-overview">
-    <button className="overview-today-summary" onClick={go} aria-label="Abrir agenda das sessões de hoje">
-      <span className="eyebrow">AGENDA DE HOJE</span>
-      <div className="overview-today-stats">
-        <div><small>Total no dia</small><strong>{loading ? "—" : todaySessions.length}</strong></div>
-        <div><small>Realizadas</small><strong>{loading ? "—" : todayCompleted}</strong></div>
-        <div><small>Canceladas</small><strong>{loading ? "—" : todayCanceled}</strong></div>
-        <div><small>Ainda por atender</small><strong>{loading ? "—" : todayUpcoming}</strong></div>
+    <div className="overview-welcome-row">
+      <div><span className="eyebrow">SEU DIA</span><h2>Agenda organizada, atendimento tranquilo.</h2><p>Acompanhe as sessões e resolva o que precisa de atenção.</p></div>
+      <div className="overview-quick-actions">
+        <button className="primary" onClick={newSession}>＋ Novo agendamento</button>
+        <button className="ghost bordered" onClick={newPatient}>＋ Cadastrar paciente</button>
       </div>
-      {!loading && (todayNoShow > 0 || todayPending > 0 || todayInProgress > 0) && <small className="overview-today-extra">{[todayNoShow > 0 && `${todayNoShow} não compareceu`, todayPending > 0 && `${todayPending} aguardando resultado`, todayInProgress > 0 && `${todayInProgress} em andamento`].filter(Boolean).join(" · ")}</small>}
-    </button>
-    <div className="overview-session-cards">
-      <button className="dashboard-card" onClick={go}><span>Próxima sessão</span><strong>{next ? dateTime(next.startsAt) : "—"}</strong><small>{next ? next.patientName : loading ? "Carregando…" : "Nenhuma sessão agendada"}</small></button>
-      <article className="dashboard-card"><span>Status a atualizar</span><strong>{loading ? "—" : pending.length}</strong><small>sessões passadas nos últimos 90 dias</small></article>
     </div>
     {error && <div className="error banner">{error}</div>}
-    <article className="overview-pending-list"><div className="overview-pending-head"><div><span className="eyebrow">ACOMPANHAMENTO</span><h2>Atualizar resultado das sessões</h2></div><small>{pending.length} pendente(s)</small></div>
-      {pending.length ? pending.slice(0, visiblePending).map(item => {
-        return <button key={item.id} onClick={() => { setPendingError(""); setSelectedPending(item); }}><strong>{item.patientName}</strong><span>{dateTime(item.startsAt)} · {item.status === "CONFIRMED" ? "Confirmada" : "Agendada"}</span><b>Atualizar ›</b></button>;
-      }) : <p>{loading ? "Carregando sessões…" : "Nenhuma sessão pendente de atualização."}</p>}
-      {pending.length > 5 && <div className="overview-pending-footer">
-        <span>Mostrando {Math.min(visiblePending, pending.length)} de {pending.length}</span>
-        {visiblePending < pending.length
-          ? <button type="button" className="link" onClick={() => setVisiblePending(count => count + 5)}>Ver mais {Math.min(5, pending.length - visiblePending)}</button>
-          : <button type="button" className="link" onClick={() => setVisiblePending(5)}>Mostrar menos</button>}
-      </div>}
-    </article>
-    <article className="overview-pending-list"><div className="overview-pending-head"><div><span className="eyebrow">AGENDA</span><h2>Próximos atendimentos</h2></div><button className="link" onClick={go}>Abrir agenda</button></div>
-      {upcoming.length ? upcoming.slice(0, visibleUpcoming).map(item => {
-        return <button key={item.id} onClick={() => setSelectedUpcoming(item)}><strong>{item.patientName}</strong><span>{dateTime(item.startsAt)} · {item.modality === "ONLINE" ? "Online" : "Presencial"}</span><b>Ver sessão ›</b></button>;
-      }) : <p>{loading ? "Carregando sessões…" : "Nenhuma sessão agendada."}</p>}
-      {upcoming.length > 3 && <div className="overview-pending-footer">
-        <span>Mostrando {Math.min(visibleUpcoming, upcoming.length)} de {upcoming.length}</span>
-        {visibleUpcoming < upcoming.length
-          ? <button type="button" className="link" onClick={() => setVisibleUpcoming(count => count + 3)}>Ver mais {Math.min(3, upcoming.length - visibleUpcoming)}</button>
-          : <button type="button" className="link" onClick={() => setVisibleUpcoming(3)}>Mostrar menos</button>}
-      </div>}
-    </article>
+    <div className="overview-kpis" aria-label="Resumo da agenda">
+      <article><span>Consultas hoje</span><strong>{loading ? "—" : todaySessions.length}</strong><small>{todayUpcoming} ainda por atender</small></article>
+      <article><span>Confirmadas</span><strong>{loading ? "—" : confirmedUpcoming}</strong><small>próximas consultas</small></article>
+      <article><span>Aguardando confirmação</span><strong>{loading ? "—" : awaitingConfirmation}</strong><small>status agendado</small></article>
+      <article className={pending.length ? "attention" : ""}><span>Resultados pendentes</span><strong>{loading ? "—" : pending.length}</strong><small>todo o período</small></article>
+    </div>
+    <div className="overview-main-grid">
+      <article className="overview-day-card">
+        <div className="overview-card-head"><div><span className="eyebrow">AGENDA DE HOJE</span><h2>{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}</h2></div><button className="link" onClick={go}>Ver agenda semanal ›</button></div>
+        <div className="overview-day-summary"><span>{todayCompleted} realizadas</span><span>{todayCanceled} canceladas</span>{todayNoShow > 0 && <span>{todayNoShow} não compareceram</span>}{todayPending > 0 && <span>{todayPending} aguardando resultado</span>}{todayInProgress > 0 && <span>{todayInProgress} em andamento</span>}</div>
+        <div className="overview-day-list">
+          {todaySessions.length ? todaySessions.map(item => <button key={item.id} onClick={() => new Date(item.endsAt).getTime() < now && (item.status === "SCHEDULED" || item.status === "CONFIRMED") ? setSelectedPending(item) : setSelectedUpcoming(item)}>
+            <time>{new Date(item.startsAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</time><span><strong>{item.patientName}</strong><small>{item.modality === "ONLINE" ? "Online" : "Presencial"}</small></span><i className={`overview-status ${item.status.toLowerCase()}`}>{item.status === "SCHEDULED" ? "Agendada" : item.status === "CONFIRMED" ? "Confirmada" : item.status === "COMPLETED" ? "Realizada" : item.status === "CANCELED" ? "Cancelada" : "Não compareceu"}</i>
+          </button>) : <div className="overview-empty"><strong>Agenda livre hoje</strong><span>Use a agenda semanal para escolher um horário disponível.</span><button className="link" onClick={newSession}>Criar agendamento</button></div>}
+        </div>
+      </article>
+      <aside className="overview-confirmations">
+        <div className="overview-card-head"><div><span className="eyebrow">CONFIRMAÇÕES</span><h2>WhatsApp</h2></div><span className="future-badge">Em preparação</span></div>
+        <p>Os estados abaixo usam os dados reais da agenda. O envio e a resposta automática serão ativados na integração.</p>
+        <dl><div><dt>Aguardando confirmação</dt><dd>{awaitingConfirmation}</dd></div><div><dt>Confirmadas</dt><dd>{confirmedUpcoming}</dd></div><div><dt>Canceladas hoje</dt><dd>{todayCanceled}</dd></div><div><dt>Reagendamento solicitado</dt><dd>—</dd></div></dl>
+        <small>Reagendamento solicitado ainda não existe no contrato atual da API.</small>
+      </aside>
+    </div>
+    <div className="overview-lower-grid">
+      <article className="overview-pending-list"><div className="overview-pending-head"><div><span className="eyebrow">PRÓXIMAS CONSULTAS</span><h2>Próximos atendimentos</h2></div><button className="link" onClick={go}>Abrir agenda</button></div>
+        {upcoming.length ? upcoming.slice(0, visibleUpcoming).map(item => <button key={item.id} onClick={() => setSelectedUpcoming(item)}><strong>{item.patientName}</strong><span>{dateTime(item.startsAt)} · {item.modality === "ONLINE" ? "Online" : "Presencial"}</span><b className={`overview-status ${item.status.toLowerCase()}`}>{item.status === "CONFIRMED" ? "Confirmada" : "Aguardando"}</b></button>) : <p>{loading ? "Carregando sessões…" : "Nenhuma sessão agendada."}</p>}
+        {upcoming.length > 3 && <div className="overview-pending-footer"><span>Mostrando {Math.min(visibleUpcoming, upcoming.length)} de {upcoming.length}</span>{visibleUpcoming < upcoming.length ? <button type="button" className="link" onClick={() => setVisibleUpcoming(count => count + 3)}>Ver mais {Math.min(3, upcoming.length - visibleUpcoming)}</button> : <button type="button" className="link" onClick={() => setVisibleUpcoming(3)}>Mostrar menos</button>}</div>}
+      </article>
+      <article className="overview-pending-list"><div className="overview-pending-head"><div><span className="eyebrow">ATENÇÃO</span><h2>Atualizar resultados</h2></div><small>{pending.length} pendente(s)</small></div>
+        {pending.length ? pending.slice(0, visiblePending).map(item => <button key={item.id} onClick={() => { setPendingError(""); setSelectedPending(item); }}><strong>{item.patientName}</strong><span>{dateTime(item.startsAt)}</span><b>Atualizar ›</b></button>) : <p>{loading ? "Carregando sessões…" : "Tudo atualizado por aqui."}</p>}
+        {pending.length > 5 && <div className="overview-pending-footer"><span>Mostrando {Math.min(visiblePending, pending.length)} de {pending.length}</span>{visiblePending < pending.length ? <button type="button" className="link" onClick={() => setVisiblePending(count => count + 5)}>Ver mais {Math.min(5, pending.length - visiblePending)}</button> : <button type="button" className="link" onClick={() => setVisiblePending(5)}>Mostrar menos</button>}</div>}
+      </article>
+    </div>
     {selectedUpcoming && <div className="modal-backdrop"><section className="modal" role="dialog" aria-modal="true" aria-labelledby="upcoming-session-title">
       <div className="modal-head"><h2 id="upcoming-session-title">Detalhes da sessão</h2><button type="button" onClick={() => setSelectedUpcoming(null)} aria-label="Fechar">×</button></div>
       <div className="overview-session-details">
@@ -819,7 +926,10 @@ function Profile({
           </> : <>
           <label>
             Fuso horário
-            <select name="timezone" defaultValue={item.timezone ?? "America/Sao_Paulo"}><option value="America/Sao_Paulo">Brasília (GMT-3)</option></select>
+            <select name="timezone" defaultValue={item.timezone ?? "America/Sao_Paulo"}>
+              {!TIMEZONES.some(([value]) => value === item.timezone) && <option value={item.timezone}>{item.timezone}</option>}
+              {TIMEZONES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
           </label>
           <label>
             Duração padrão da sessão

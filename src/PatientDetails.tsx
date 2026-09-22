@@ -42,20 +42,23 @@ export function PatientDetails({
     [editingSession, setEditingSession] = useState<Appointment | null>(null),
     [viewingSession, setViewingSession] = useState<Appointment | null>(null);
   const loadSessions = useCallback(async () => {
-    const now = new Date(),
-      start = new Date(now),
-      end = new Date(now);
-    start.setMonth(start.getMonth() - 6);
-    end.setMonth(end.getMonth() + 6);
     try {
-      const all = await api.sessions(session, start.toISOString(), end.toISOString());
-      setItems(all.filter((item) => item.patientId === patient.id));
+      setItems(await api.patientSessions(session, patient.id));
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível carregar as sessões");
     }
   }, [session, patient.id]);
   useEffect(() => { void loadSessions(); }, [loadSessions]);
+  async function changeActive() {
+    if (patient.active && !window.confirm(`Desativar ${patient.fullName}?`)) return;
+    setError("");
+    try {
+      await toggleActive();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível alterar o status do paciente");
+    }
+  }
   const { history, next, completed } = useMemo(() => {
     const now = Date.now(),
       history = items
@@ -103,16 +106,13 @@ export function PatientDetails({
               </button>
               <button
                 className="ghost patient-deactivate"
-                onClick={() => {
-                  if (window.confirm(`Desativar ${patient.fullName}?`))
-                    void toggleActive();
-                }}
+                onClick={() => void changeActive()}
               >
                 Desativar
               </button>
             </>
           ) : (
-            <button className="primary" onClick={() => void toggleActive()}>
+            <button className="primary" onClick={() => void changeActive()}>
               Ativar paciente
             </button>
           )}
@@ -155,14 +155,9 @@ export function PatientDetails({
           item={editingSession}
           close={() => setEditingSession(null)}
           save={async (status) => {
-            await api.updateSession(session, editingSession.id, {
-              patientId: editingSession.patientId,
-              startsAt: editingSession.startsAt,
-              endsAt: editingSession.endsAt,
-              modality: editingSession.modality,
-              meetingLink: editingSession.meetingLink,
-              notes: editingSession.notes,
+            await api.updateSessionResult(session, editingSession.id, {
               status,
+              notes: editingSession.notes,
             });
             setEditingSession(null);
             await loadSessions();

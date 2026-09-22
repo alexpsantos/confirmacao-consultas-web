@@ -117,8 +117,19 @@ function ProfessionalEditor({ item, close, save }: { item: Professional; close: 
 }
 
 export function PatientEditor({ item, close, save, toggleActive }: { item: Patient; close: () => void; save: (data: object) => Promise<void>; toggleActive?: () => Promise<void> }) {
+  const [actionError, setActionError] = useState('')
+  async function changeStatus(confirmMessage?: string) {
+    if (!toggleActive) return
+    if (confirmMessage && !window.confirm(confirmMessage)) return
+    setActionError('')
+    try {
+      await toggleActive()
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Não foi possível alterar o status do paciente')
+    }
+  }
 
-  if (!item.active) return <div className="modal-backdrop"><section className="modal"><div className="modal-head"><h2>Paciente inativo</h2><button onClick={close}>×</button></div><div className="inactive-editor"><p>Dados disponíveis somente para consulta. Ative o paciente para editar informações.</p><div className="patient-readonly"><div><small>Nome completo</small><strong>{item.fullName}</strong></div><div><small>E-mail</small><strong>{item.email || '—'}</strong></div><div><small>Telefone</small><strong>{formatPhone(item.phone)}</strong></div><div><small>Data de nascimento</small><strong>{item.birthDate ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(new Date(`${item.birthDate}T00:00:00Z`)) : '—'}</strong></div><div><small>Canal preferencial</small><strong>{item.preferredChannel === 'WHATSAPP' ? 'WhatsApp' : 'E-mail'}</strong></div><div><small>Lembretes pelo WhatsApp</small><strong>{item.whatsappRemindersEnabled === false ? 'Desativados' : 'Ativados'}</strong></div></div><div className="form-actions"><button type="button" className="ghost" onClick={close}>Fechar</button>{toggleActive && <button className="primary" onClick={async () => { await toggleActive() }}>Ativar paciente</button>}</div></div></section></div>
+  if (!item.active) return <div className="modal-backdrop"><section className="modal"><div className="modal-head"><h2>Paciente inativo</h2><button onClick={close}>×</button></div><div className="inactive-editor"><p>Dados disponíveis somente para consulta. Ative o paciente para editar informações.</p><div className="patient-readonly"><div><small>Nome completo</small><strong>{item.fullName}</strong></div><div><small>E-mail</small><strong>{item.email || '—'}</strong></div><div><small>Telefone</small><strong>{formatPhone(item.phone)}</strong></div><div><small>Data de nascimento</small><strong>{item.birthDate ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(new Date(`${item.birthDate}T00:00:00Z`)) : '—'}</strong></div><div><small>Canal preferencial</small><strong>{item.preferredChannel === 'WHATSAPP' ? 'WhatsApp' : 'E-mail'}</strong></div><div><small>Lembretes pelo WhatsApp</small><strong>{item.whatsappRemindersEnabled === false ? 'Desativados' : 'Ativados'}</strong></div></div>{actionError && <div className="error">{actionError}</div>}<div className="form-actions"><button type="button" className="ghost" onClick={close}>Fechar</button>{toggleActive && <button className="primary" onClick={() => void changeStatus()}>Ativar paciente</button>}</div></div></section></div>
   return <Editor title="Editar paciente" close={close} submit={async form => save({ fullName: form.get('fullName'), birthDate: form.get('birthDate') || null, phone: form.get('phone'), email: form.get('email') || null, preferredChannel: form.get('preferredChannel'), whatsappRemindersEnabled: form.has('whatsappRemindersEnabled') })}>
     <label className="span">Nome completo<input name="fullName" defaultValue={item.fullName} required maxLength={150} /></label>
     <label>Data de nascimento<input name="birthDate" type="date" min="1900-01-01" max={new Date().toISOString().slice(0, 10)} defaultValue={item.birthDate ?? ''} /></label>
@@ -126,7 +137,8 @@ export function PatientEditor({ item, close, save, toggleActive }: { item: Patie
     <label>E-mail<input name="email" type="email" defaultValue={item.email ?? ''} maxLength={254} pattern="[^\s@]+@[^\s@]+\.[^\s@]+" /></label>
     <label>Canal preferencial<select name="preferredChannel" defaultValue={item.preferredChannel}><option>WHATSAPP</option><option>EMAIL</option></select></label>
     <label className="span reminder-option"><input type="checkbox" name="whatsappRemindersEnabled" defaultChecked={item.whatsappRemindersEnabled !== false} /> Lembretes via WhatsApp</label>
-    {toggleActive && <div className="form-actions span"><button type="button" className="link danger-link" onClick={async () => { if (window.confirm(`Deseja desativar ${item.fullName}? O cadastro e o histórico serão preservados.`)) await toggleActive() }}>Desativar paciente</button></div>}
+    {actionError && <div className="error span">{actionError}</div>}
+    {toggleActive && <div className="form-actions span"><button type="button" className="link danger-link" onClick={() => void changeStatus(`Deseja desativar ${item.fullName}? O cadastro e o histórico serão preservados.`)}>Desativar paciente</button></div>}
   </Editor>
 }
 

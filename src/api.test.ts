@@ -39,7 +39,7 @@ describe('contrato administrativo de profissionais', () => {
 
     expect(result.content).toEqual([professional])
     expect(fetchMock).toHaveBeenCalledWith(
-      `${API_URL}/api/v1/admin/professionals?size=100&sort=fullName,asc`,
+      `${API_URL}/api/v1/admin/professionals?sort=fullName,asc&page=0&size=100`,
       expect.objectContaining({ headers: { Authorization: 'Bearer admin-token' } }),
     )
   })
