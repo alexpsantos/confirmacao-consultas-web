@@ -1,0 +1,2 @@
+import { API_URL, type Appointment, type Session } from './api';
+export async function createSessionSeries(session: Session, data: object): Promise<Appointment[]> { const response = await fetch(`${API_URL}/api/v1/sessions/series`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.accessToken}` }, body: JSON.stringify(data) }); if (!response.ok) { const body = await response.json().catch(() => null); throw new Error(String(body?.message ?? 'Não foi possível criar a série de sessões')); } return response.json(); }

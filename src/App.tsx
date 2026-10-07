@@ -460,7 +460,7 @@ function Dashboard({
         {view === "sessions" && !admin && (
           <SessionsView session={session} patients={patients} professional={professionals[0]} initialPatientId={schedulePatientId ?? undefined} openNewSession={scheduleNewSession} onInitialPatientHandled={() => { setSchedulePatientId(null); setScheduleNewSession(false); }} />
         )}{" "}
-        {view === "patient-detail" && selectedPatient && !admin && <PatientDetails session={session} patient={selectedPatient} back={() => setView("patients")} edit={() => setEditingPatient(selectedPatient)} toggleActive={async () => { await api.togglePatient(session, selectedPatient); setSelectedPatient({...selectedPatient, active: !selectedPatient.active}); await load() }} newSession={() => { setSchedulePatientId(selectedPatient.id); setView("sessions") }} />}{" "}
+        {view === "patient-detail" && selectedPatient && !admin && <PatientDetails session={session} patient={selectedPatient} professional={professionals[0]} back={() => setView("patients")} edit={() => setEditingPatient(selectedPatient)} toggleActive={async () => { await api.togglePatient(session, selectedPatient); setSelectedPatient({...selectedPatient, active: !selectedPatient.active}); await load() }} newSession={() => { setSchedulePatientId(selectedPatient.id); setView("sessions") }} />}{" "}
         {view === "patients" &&
           (admin ? (
             <AdminPatients
@@ -780,7 +780,7 @@ function ProfessionalOverview({ session, patients, openPatient, go, newPatient, 
       <div className="modal-head"><h2 id="pending-session-title">Atualizar resultado</h2><button type="button" onClick={() => setSelectedPending(null)} aria-label="Fechar">×</button></div>
       <form className="overview-status-form" onSubmit={updatePendingStatus}>
         <p><strong>{selectedPending.patientName}</strong><br /><span>{dateTime(selectedPending.startsAt)} · {selectedPending.modality === "ONLINE" ? "Online" : "Presencial"}</span></p>
-        <label>Status da sessão<select name="status" defaultValue="COMPLETED"><option value="COMPLETED">Realizada</option><option value="NO_SHOW">Não compareceu</option><option value="CANCELED">Cancelada</option></select></label>
+        <label>Status da sessão<select name="status" defaultValue="COMPLETED"><option value="COMPLETED">Realizada</option><option value="NO_SHOW">Não compareceu</option></select></label>
         <label>Observação <small>(opcional)</small><input name="notes" defaultValue={selectedPending.notes ?? ""} maxLength={500} /></label>
         {pendingError && <div className="error">{pendingError}</div>}
         <div className="form-actions"><button type="button" className="ghost" onClick={() => { const patient = patients.find(p => p.id === selectedPending.patientId); if (patient) { setSelectedPending(null); openPatient(patient); } }} disabled={!patients.some(p => p.id === selectedPending.patientId)}>Ver paciente</button><button className="primary" disabled={updatingPending}>{updatingPending ? "Salvando…" : "Salvar status"}</button></div>
