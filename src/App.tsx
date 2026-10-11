@@ -4,6 +4,7 @@ import {
   api,
   type AuditLog,
   type Appointment,
+  type OperationalSummary,
   type Patient,
   type Professional,
   type Session,
@@ -16,10 +17,19 @@ import {
 } from "./AdminTables";
 import { SessionsView } from "./Sessions";
 import { PatientDetails } from "./PatientDetails";
+import { ProfessionalLocation } from "./ProfessionalLocation";
 import "./App.css";
 import "./Profile.css";
 import "./OverviewSessions.css";
 const STORAGE = "confirma.session.v2";
+type OperationalPeriod = "7d" | "month" | "30d";
+function operationalRange(period: OperationalPeriod) {
+  const now = new Date();
+  if (period === "month") return { start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(), end: new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString() };
+  const start = new Date(now);
+  start.setDate(start.getDate() - (period === "7d" ? 7 : 30));
+  return { start: start.toISOString(), end: now.toISOString() };
+}
 const TIMEZONES = [
   ["America/Noronha", "Fernando de Noronha (UTC-2)"],
   ["America/Belem", "Belém (UTC-3)"],
@@ -301,9 +311,12 @@ function Dashboard({
     [users, setUsers] = useState<User[]>([]),
     [logs, setLogs] = useState<AuditLog[]>([]),
     [error, setError] = useState(""),
+    [success, setSuccess] = useState(""),
     [modal, setModal] = useState(false),
     [changePassword, setChangePassword] = useState(false),
     [loginFailuresLast7Days, setLoginFailuresLast7Days] = useState(0),
+    [operational, setOperational] = useState<OperationalSummary | null>(null),
+    [operationalPeriod, setOperationalPeriod] = useState<OperationalPeriod>("month"),
     [selectedPatient, setSelectedPatient] = useState<Patient | null>(null),
     [editingPatient, setEditingPatient] = useState<Patient | null>(null),
     [schedulePatientId, setSchedulePatientId] = useState<string | null>(null),
@@ -312,18 +325,21 @@ function Dashboard({
     try {
       setError("");
       if (admin) {
-        const [p, pa, u, l, s] = await Promise.all([
+        const range = operationalRange(operationalPeriod);
+        const [p, pa, u, l, s, operationalSummary] = await Promise.all([
           api.adminProfessionals(session),
           api.adminPatients(session),
           api.adminUsers(session),
           api.adminAudit(session),
           api.adminAuditSummary(session),
+          api.adminOperationalSummary(session, range.start, range.end),
         ]);
         setProfessionals(p.content);
         setPatients(pa.content);
         setUsers(u.content);
         setLogs(l.content);
         setLoginFailuresLast7Days(s.loginFailuresLast7Days);
+        setOperational(operationalSummary);
       } else {
         const [p, pa] = await Promise.all([
           api.me(session),
@@ -335,7 +351,7 @@ function Dashboard({
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao carregar");
     }
-  }, [admin, session]);
+  }, [admin, session, operationalPeriod]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -435,16 +451,19 @@ function Dashboard({
             <h1>{title[view]}</h1>
           </div>
         </header>
-        {error && <div className="error banner">{error}</div>}
+        {error && <div className="error banner" role="alert"><span>{error}</span><button type="button" className="banner-close" onClick={() => setError("")} aria-label="Fechar aviso">×</button></div>}
+        {success && <div className="success banner" role="status"><span>{success}</span><button type="button" className="banner-close" onClick={() => setSuccess("")} aria-label="Fechar aviso">×</button></div>}
         {view === "overview" && (
           <Overview
             session={session}
             admin={admin}
             professionals={professionals}
             patients={patients}
-            users={users}
             logs={logs}
             loginFailuresLast7Days={loginFailuresLast7Days}
+            operational={operational}
+            operationalPeriod={operationalPeriod}
+            setOperationalPeriod={setOperationalPeriod}
             go={setView}
             openPatient={(patient) => { setSelectedPatient(patient); setView("patient-detail") }}
             openPatients={() => {
@@ -455,12 +474,12 @@ function Dashboard({
           />
         )}{" "}
         {view === "profile" && (
-          <Profile item={professionals[0]} session={session} saved={load} />
+          <Profile item={professionals[0]} session={session} saved={async () => { await load(); setSuccess("Perfil atualizado com sucesso."); }} />
         )}{" "}
         {view === "sessions" && !admin && (
           <SessionsView session={session} patients={patients} professional={professionals[0]} initialPatientId={schedulePatientId ?? undefined} openNewSession={scheduleNewSession} onInitialPatientHandled={() => { setSchedulePatientId(null); setScheduleNewSession(false); }} />
         )}{" "}
-        {view === "patient-detail" && selectedPatient && !admin && <PatientDetails session={session} patient={selectedPatient} professional={professionals[0]} back={() => setView("patients")} edit={() => setEditingPatient(selectedPatient)} toggleActive={async () => { await api.togglePatient(session, selectedPatient); setSelectedPatient({...selectedPatient, active: !selectedPatient.active}); await load() }} newSession={() => { setSchedulePatientId(selectedPatient.id); setView("sessions") }} />}{" "}
+        {view === "patient-detail" && selectedPatient && !admin && <PatientDetails session={session} patient={selectedPatient} professional={professionals[0]} back={() => setView("patients")} edit={() => setEditingPatient(selectedPatient)} toggleActive={async () => { const active = !selectedPatient.active; await api.togglePatient(session, selectedPatient); setSelectedPatient({...selectedPatient, active}); await load(); setSuccess(active ? "Paciente ativado com sucesso." : "Paciente desativado com sucesso."); }} newSession={() => { setSchedulePatientId(selectedPatient.id); setView("sessions") }} />}{" "}
         {view === "patients" &&
           (admin ? (
             <AdminPatients
@@ -477,6 +496,7 @@ function Dashboard({
               toggle={async (p) => {
                 await api.togglePatient(session, p);
                 await load();
+                setSuccess(p.active ? "Paciente desativado com sucesso." : "Paciente ativado com sucesso.");
               }}
               open={(p) => { setSelectedPatient(p); setView("patient-detail") }}
             />
@@ -517,6 +537,7 @@ function Dashboard({
             setSelectedPatient(updated);
             setEditingPatient(null);
             await load();
+            setSuccess("Dados do paciente atualizados com sucesso.");
           }}
           toggleActive={async () => {
             await api.togglePatient(session, editingPatient);
@@ -533,6 +554,7 @@ function Dashboard({
             await api.createPatient(session, d);
             setModal(false);
             await load();
+            setSuccess("Paciente cadastrado com sucesso.");
           }}
         />
       )}
@@ -568,9 +590,11 @@ function Overview({
   admin,
   professionals,
   patients,
-  users,
   logs,
   loginFailuresLast7Days,
+  operational,
+  operationalPeriod,
+  setOperationalPeriod,
   go,
   openPatient,
   openPatients,
@@ -581,39 +605,44 @@ function Overview({
   admin: boolean;
   professionals: Professional[];
   patients: Patient[];
-  users: User[];
   logs: AuditLog[];
   loginFailuresLast7Days: number;
+  operational: OperationalSummary | null;
+  operationalPeriod: OperationalPeriod;
+  setOperationalPeriod: (period: OperationalPeriod) => void;
   go: (view: View) => void;
   openPatient: (patient: Patient) => void;
   openPatients: () => void;
   newPatient: () => void;
   newSession: () => void;
 }) {
-  const inactiveProfessionals = professionals.filter((p) => !p.active).length,
-    inactivePatients = patients.filter((p) => !p.active).length;
+  const inactiveProfessionals = professionals.filter((p) => !p.active).length;
   return (
     <>
-      {admin && <section className="stats">
+      {admin && <><section className="stats four">
         <Card
-          label="Profissionais"
-          value={professionals.length}
-          detail={`${professionals.filter((p) => p.active).length} ativos · ${inactiveProfessionals} inativos`}
+          label="Profissionais ativos"
+          value={operational?.activeProfessionals ?? "—"}
+          detail={`${professionals.length} cadastrados`}
           go={() => go(admin ? "professionals" : "profile")}
         />
         <Card
-          label="Pacientes"
-          value={patients.length}
-          detail={`${patients.filter((p) => p.active).length} ativos · ${inactivePatients} inativos`}
+          label="Pacientes ativos"
+          value={operational?.activePatients ?? "—"}
+          detail={`${patients.length} cadastrados`}
           go={openPatients}
         />
         <Card
-          label="Usuários"
-          value={users.length}
-          detail={`${users.filter((u) => u.active).length} acessos ativos`}
-          go={() => go("users")}
+          label="Sessões no período"
+          value={operational?.sessions ?? "—"}
+          detail={operationalPeriod === "month" ? "este mês" : operationalPeriod === "7d" ? "últimos 7 dias" : "últimos 30 dias"}
         />
-      </section>}
+        <Card
+          label="Cancelamentos"
+          value={operational?.canceledSessions ?? "—"}
+          detail="no período selecionado"
+        />
+      </section><div className="admin-operational-period"><label>Período dos indicadores<select value={operationalPeriod} onChange={event => setOperationalPeriod(event.target.value as OperationalPeriod)}><option value="month">Este mês</option><option value="7d">Últimos 7 dias</option><option value="30d">Últimos 30 dias</option></select></label></div></>}
       {!admin && <ProfessionalOverview session={session} patients={patients} openPatient={openPatient} go={() => go("sessions")} newPatient={newPatient} newSession={newSession} />}
       {admin && <section className="overview-grid">
         <article className="welcome operational">
@@ -671,7 +700,7 @@ function ProfessionalOverview({ session, patients, openPatient, go, newPatient, 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [visiblePending, setVisiblePending] = useState(5);
-  const [visibleUpcoming, setVisibleUpcoming] = useState(3);
+  const [visibleUpcoming, setVisibleUpcoming] = useState(5);
   const [selectedUpcoming, setSelectedUpcoming] = useState<Appointment | null>(null);
   const [selectedPending, setSelectedPending] = useState<Appointment | null>(null);
   const [updatingPending, setUpdatingPending] = useState(false);
@@ -695,15 +724,18 @@ function ProfessionalOverview({ session, patients, openPatient, go, newPatient, 
     .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
   const today = new Date().toDateString();
   const todaySessions = appointments.filter(item => new Date(item.startsAt).toDateString() === today).sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
-  const todayCompleted = todaySessions.filter(item => item.status === "COMPLETED").length;
-  const todayCanceled = todaySessions.filter(item => item.status === "CANCELED").length;
   const todayUpcoming = todaySessions.filter(item => (item.status === "SCHEDULED" || item.status === "CONFIRMED") && new Date(item.startsAt).getTime() > now).length;
-  const todayNoShow = todaySessions.filter(item => item.status === "NO_SHOW").length;
-  const todayPending = todaySessions.filter(item => (item.status === "SCHEDULED" || item.status === "CONFIRMED") && new Date(item.endsAt).getTime() <= now).length;
-  const todayInProgress = todaySessions.filter(item => (item.status === "SCHEDULED" || item.status === "CONFIRMED") && new Date(item.startsAt).getTime() <= now && new Date(item.endsAt).getTime() > now).length;
+  const todayCanceled = todaySessions.filter(item => item.status === "CANCELED").length;
   const awaitingConfirmation = upcoming.filter(item => item.status === "SCHEDULED").length;
   const confirmedUpcoming = upcoming.filter(item => item.status === "CONFIRMED").length;
+  const activePatients = patients.filter(item => item.active).length;
+  const firstName = session.name.trim().split(/\s+/)[0] || "";
+  const todayLabel = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
   const dateTime = (value: string) => new Date(value).toLocaleString("pt-BR", { dateStyle: "medium", timeStyle: "short" });
+  const sessionDate = (value: string) => new Date(value).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "short" });
+  const sessionDay = (value: string) => new Date(value).toLocaleDateString("pt-BR", { day: "2-digit" });
+  const sessionMonth = (value: string) => new Date(value).toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
+  const sessionTime = (item: Appointment) => `${new Date(item.startsAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} – ${new Date(item.endsAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
   async function updatePendingStatus(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedPending) return;
@@ -721,7 +753,8 @@ function ProfessionalOverview({ session, patients, openPatient, go, newPatient, 
   }
   return <section className="professional-overview">
     <div className="overview-welcome-row">
-      <div><span className="eyebrow">SEU DIA</span><h2>Agenda organizada, atendimento tranquilo.</h2><p>Acompanhe as sessões e resolva o que precisa de atenção.</p></div>
+      <div><h2>Bom dia, {firstName}!</h2><p>Agenda organizada, atendimento tranquilo.</p></div>
+      <time className="overview-current-date"><span>{todayLabel}</span><span aria-hidden="true">☼</span></time>
       <div className="overview-quick-actions">
         <button className="primary" onClick={newSession}>＋ Novo agendamento</button>
         <button className="ghost bordered" onClick={newPatient}>＋ Cadastrar paciente</button>
@@ -729,19 +762,26 @@ function ProfessionalOverview({ session, patients, openPatient, go, newPatient, 
     </div>
     {error && <div className="error banner">{error}</div>}
     <div className="overview-kpis" aria-label="Resumo da agenda">
-      <article><span>Consultas hoje</span><strong>{loading ? "—" : todaySessions.length}</strong><small>{todayUpcoming} ainda por atender</small></article>
-      <article><span>Confirmadas</span><strong>{loading ? "—" : confirmedUpcoming}</strong><small>próximas consultas</small></article>
-      <article><span>Aguardando confirmação</span><strong>{loading ? "—" : awaitingConfirmation}</strong><small>status agendado</small></article>
-      <article className={pending.length ? "attention" : ""}><span>Resultados pendentes</span><strong>{loading ? "—" : pending.length}</strong><small>todo o período</small></article>
+      <article className="today"><span className="overview-kpi-icon"><OverviewIcon type="calendar" /></span><div><span>Consultas hoje</span><strong>{loading ? "—" : todaySessions.length}</strong><small>{todayUpcoming ? `${todayUpcoming} ainda por atender` : "Ainda por atender"}</small></div></article>
+      <article className="patients"><span className="overview-kpi-icon"><OverviewIcon type="patients" /></span><div><span>Pacientes ativos</span><strong>{activePatients}</strong><small>Em acompanhamento</small></div></article>
+      <article className="results"><span className="overview-kpi-icon"><OverviewIcon type="document" /></span><div><span>Resultados pendentes</span><strong>{loading ? "—" : pending.length}</strong><small>Aguardando sua revisão</small></div></article>
     </div>
     <div className="overview-main-grid">
       <article className="overview-day-card">
-        <div className="overview-card-head"><div><span className="eyebrow">AGENDA DE HOJE</span><h2>{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}</h2></div><button className="link" onClick={go}>Ver agenda semanal ›</button></div>
-        <div className="overview-day-summary"><span>{todayCompleted} realizadas</span><span>{todayCanceled} canceladas</span>{todayNoShow > 0 && <span>{todayNoShow} não compareceram</span>}{todayPending > 0 && <span>{todayPending} aguardando resultado</span>}{todayInProgress > 0 && <span>{todayInProgress} em andamento</span>}</div>
+        <div className="overview-card-head overview-agenda-head"><h2><span className="overview-agenda-title-icon" aria-hidden="true"><OverviewIcon type="calendar" /></span>Sua agenda de hoje</h2><button className="link" onClick={go}>Ver agenda semanal ›</button></div>
         <div className="overview-day-list">
           {todaySessions.length ? todaySessions.map(item => <button key={item.id} onClick={() => new Date(item.endsAt).getTime() < now && (item.status === "SCHEDULED" || item.status === "CONFIRMED") ? setSelectedPending(item) : setSelectedUpcoming(item)}>
             <time>{new Date(item.startsAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</time><span><strong>{item.patientName}</strong><small>{item.modality === "ONLINE" ? "Online" : "Presencial"}</small></span><i className={`overview-status ${item.status.toLowerCase()}`}>{item.status === "SCHEDULED" ? "Agendada" : item.status === "CONFIRMED" ? "Confirmada" : item.status === "COMPLETED" ? "Realizada" : item.status === "CANCELED" ? "Cancelada" : "Não compareceu"}</i>
-          </button>) : <div className="overview-empty"><strong>Agenda livre hoje</strong><span>Use a agenda semanal para escolher um horário disponível.</span><button className="link" onClick={newSession}>Criar agendamento</button></div>}
+          </button>) : <div className="overview-empty overview-empty-agenda">
+            <span className="overview-empty-calendar" aria-hidden="true"><svg viewBox="0 0 64 64"><rect x="12" y="17" width="40" height="36" rx="5"/><path d="M20 10v13M44 10v13M12 28h40M25 39l6 6 11-12"/><path className="overview-empty-rays" d="M53 16l5-4M56 25h7M51 9l2-6"/></svg></span>
+            <strong>Nenhum atendimento agendado para hoje</strong><span>Aproveite para adiantar pendências ou agendar novos pacientes.</span><button className="primary overview-empty-action" onClick={newSession}>＋ Novo agendamento</button>
+            <svg className="overview-empty-landscape" viewBox="0 0 800 190" preserveAspectRatio="none" aria-hidden="true">
+              <defs><linearGradient id="overview-wave-back" x1="0" y1="0" x2="1" y2="0"><stop stopColor="#fbf8f1"/><stop offset="1" stopColor="#f6eddd"/></linearGradient><linearGradient id="overview-wave-mid" x1="0" y1="0" x2="1" y2="0"><stop stopColor="#f6ebd8"/><stop offset="1" stopColor="#fbf8f0"/></linearGradient></defs>
+              <path className="wave-back" d="M0 151c101-25 178-3 259 19 118 32 220-2 327-12 93-9 151 20 214 4v28H0z"/>
+              <path className="wave-mid" d="M0 166c98-22 186 2 273 16 111 18 211-8 320-24 85-12 146-10 207 7v25H0z"/>
+              <path className="wave-front" d="M0 179c109-13 196 9 286 11 111 3 209-17 316-22 78-4 143 4 198 15v7H0z"/>
+            </svg>
+          </div>}
         </div>
       </article>
       <aside className="overview-confirmations">
@@ -752,12 +792,12 @@ function ProfessionalOverview({ session, patients, openPatient, go, newPatient, 
       </aside>
     </div>
     <div className="overview-lower-grid">
-      <article className="overview-pending-list"><div className="overview-pending-head"><div><span className="eyebrow">PRÓXIMAS CONSULTAS</span><h2>Próximos atendimentos</h2></div><button className="link" onClick={go}>Abrir agenda</button></div>
-        {upcoming.length ? upcoming.slice(0, visibleUpcoming).map(item => <button key={item.id} onClick={() => setSelectedUpcoming(item)}><strong>{item.patientName}</strong><span>{dateTime(item.startsAt)} · {item.modality === "ONLINE" ? "Online" : "Presencial"}</span><b className={`overview-status ${item.status.toLowerCase()}`}>{item.status === "CONFIRMED" ? "Confirmada" : "Aguardando"}</b></button>) : <p>{loading ? "Carregando sessões…" : "Nenhuma sessão agendada."}</p>}
-        {upcoming.length > 3 && <div className="overview-pending-footer"><span>Mostrando {Math.min(visibleUpcoming, upcoming.length)} de {upcoming.length}</span>{visibleUpcoming < upcoming.length ? <button type="button" className="link" onClick={() => setVisibleUpcoming(count => count + 3)}>Ver mais {Math.min(3, upcoming.length - visibleUpcoming)}</button> : <button type="button" className="link" onClick={() => setVisibleUpcoming(3)}>Mostrar menos</button>}</div>}
+      <article className="overview-pending-list overview-session-card"><div className="overview-pending-head"><h2><span aria-hidden="true"><OverviewIcon type="calendar" /></span>Próximas sessões</h2><button className="link" onClick={go}>Ver agenda completa ›</button></div>
+        {upcoming.length ? upcoming.slice(0, visibleUpcoming).map(item => <button className="overview-session-row" key={item.id} onClick={() => setSelectedUpcoming(item)}><span className="overview-date-tile"><strong>{sessionDay(item.startsAt)}</strong><small>{sessionMonth(item.startsAt)}</small></span><span className="overview-session-copy"><strong>{item.patientName}</strong><small>{sessionDate(item.startsAt)}</small></span><span className="overview-session-meta"><i><SessionClockIcon /></i> {sessionTime(item)} <i><SessionModalityIcon /></i> {item.modality === "ONLINE" ? "Online" : "Presencial"}</span><b className={`overview-status ${item.status.toLowerCase()}`}>{item.status === "CONFIRMED" ? "Confirmada" : "Agendada"}</b><i className="overview-row-menu" aria-hidden="true">⋮</i></button>) : <p>{loading ? "Carregando sessões…" : "Nenhuma sessão agendada."}</p>}
+        {upcoming.length > 5 && <div className="overview-pending-footer"><span>Mostrando {Math.min(visibleUpcoming, upcoming.length)} de {upcoming.length}</span>{visibleUpcoming < upcoming.length ? <button type="button" className="link" onClick={() => setVisibleUpcoming(count => count + 5)}>Ver mais {Math.min(5, upcoming.length - visibleUpcoming)}</button> : <button type="button" className="link" onClick={() => setVisibleUpcoming(5)}>Mostrar menos</button>}</div>}
       </article>
-      <article className="overview-pending-list"><div className="overview-pending-head"><div><span className="eyebrow">ATENÇÃO</span><h2>Atualizar resultados</h2></div><small>{pending.length} pendente(s)</small></div>
-        {pending.length ? pending.slice(0, visiblePending).map(item => <button key={item.id} onClick={() => { setPendingError(""); setSelectedPending(item); }}><strong>{item.patientName}</strong><span>{dateTime(item.startsAt)}</span><b>Atualizar ›</b></button>) : <p>{loading ? "Carregando sessões…" : "Tudo atualizado por aqui."}</p>}
+      <article className="overview-pending-list overview-session-card"><div className="overview-pending-head"><h2><span aria-hidden="true"><SessionClockIcon /></span>Sessões a atualizar</h2><small>{pending.length} pendente(s)</small></div>
+        {pending.length ? pending.slice(0, visiblePending).map(item => <button className="overview-session-row overview-result-row" key={item.id} onClick={() => { setPendingError(""); setSelectedPending(item); }}><span className="overview-date-tile"><strong>{sessionDay(item.startsAt)}</strong><small>{sessionMonth(item.startsAt)}</small></span><span className="overview-session-copy"><strong>{item.patientName}</strong><small>{sessionDate(item.startsAt)}</small></span><span className="overview-session-meta"><i><SessionClockIcon /></i> {sessionTime(item)} <i><SessionModalityIcon /></i> {item.modality === "ONLINE" ? "Online" : "Presencial"}</span><b className="overview-status pending">Aguardando resultado</b><i className="overview-row-menu" aria-hidden="true">⋮</i></button>) : <p>{loading ? "Carregando sessões…" : "Tudo atualizado por aqui."}</p>}
         {pending.length > 5 && <div className="overview-pending-footer"><span>Mostrando {Math.min(visiblePending, pending.length)} de {pending.length}</span>{visiblePending < pending.length ? <button type="button" className="link" onClick={() => setVisiblePending(count => count + 5)}>Ver mais {Math.min(5, pending.length - visiblePending)}</button> : <button type="button" className="link" onClick={() => setVisiblePending(5)}>Mostrar menos</button>}</div>}
       </article>
     </div>
@@ -788,6 +828,17 @@ function ProfessionalOverview({ session, patients, openPatient, go, newPatient, 
     </section></div>}
   </section>;
 }
+function OverviewIcon({ type }: { type: "calendar" | "patients" | "document" }) {
+  if (type === "calendar") return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18M8 14h3M8 17h5"/></svg>;
+  if (type === "patients") return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><circle cx="6.5" cy="10.5" r="2.2"/><circle cx="17.5" cy="10.5" r="2.2"/><path d="M5 21v-1a7 7 0 0 1 14 0v1M2.5 20v-.6a4.8 4.8 0 0 1 3.7-4.6M21.5 20v-.6a4.8 4.8 0 0 0-3.7-4.6"/></svg>;
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6zM14 3v5h5M9 13h6M9 17h6"/></svg>;
+}
+function SessionModalityIcon() {
+  return <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="4" width="9" height="8" rx="1.5"/><path d="m10.5 6.5 4-2v7l-4-2"/></svg>;
+}
+function SessionClockIcon() {
+  return <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.8"/><path d="M8 4.5V8l2.4 1.6"/></svg>;
+}
 function Card({
   label,
   value,
@@ -795,16 +846,21 @@ function Card({
   go,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   detail: string;
-  go: () => void;
+  go?: () => void;
 }) {
-  return (
+  const content = <>
+    <span>{label}</span>
+    <strong>{value}</strong>
+    <small>{detail}</small>
+  </>;
+  return go ? (
     <button className="dashboard-card" onClick={go}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small>{detail}</small>
+      {content}
     </button>
+  ) : (
+    <article className="dashboard-card">{content}</article>
   );
 }
 function Profile({
@@ -986,6 +1042,7 @@ function Profile({
             <span>Status</span>
             <Badge v={item.active ? "Ativo" : "Inativo"} />
           </div>
+          <ProfessionalLocation session={session} saved={saved} />
           </> : <>
           <div><span>Fuso horário</span><strong>{item.timezone === "America/Sao_Paulo" ? "Brasília (GMT-3)" : item.timezone}</strong></div>
           <div><span>Duração padrão</span><strong>{item.defaultSessionMinutes ?? 60} minutos</strong></div>
@@ -1168,13 +1225,23 @@ export function Users({
   const [search, setSearch] = useState("");
   const [role, setRole] = useState("");
   const [status, setStatus] = useState("");
+  const [sort, setSort] = useState("name");
+  const [page, setPage] = useState(0);
+  const pageSize = 10;
   const filtered = data.filter(user =>
     (!search.trim() || [user.name, user.email].some(value => value.toLocaleLowerCase("pt-BR").includes(search.trim().toLocaleLowerCase("pt-BR")))) &&
-    (!role || user.role === role) && (!status || String(user.active) === status));
+    (!role || user.role === role) && (!status || String(user.active) === status)
+  ).sort((a, b) => sort === "role" ? a.role.localeCompare(b.role) : sort === "status" ? Number(b.active) - Number(a.active) : a.name.localeCompare(b.name, "pt-BR"));
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, pages - 1);
+  const visible = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize);
+  const hasFilters = Boolean(search || role || status || sort !== "name");
+  function clearFilters() { setSearch(""); setRole(""); setStatus(""); setSort("name"); setPage(0); }
+  function change(setter: (value: string) => void, value: string) { setter(value); setPage(0); }
   return (
     <section className="panel">
-      <Panel title="Usuários da plataforma" />
-      <div className="admin-filter-bar"><input aria-label="Buscar usuários" placeholder="Buscar por nome ou e-mail" value={search} onChange={event => setSearch(event.target.value)} /><select aria-label="Filtrar por perfil" value={role} onChange={event => setRole(event.target.value)}><option value="">Todos os perfis</option><option value="ADMIN">Administrador</option><option value="PROFESSIONAL">Profissional</option></select><select aria-label="Filtrar por status" value={status} onChange={event => setStatus(event.target.value)}><option value="">Todos os status</option><option value="true">Ativos</option><option value="false">Inativos</option></select></div>
+      <Panel title={`${filtered.length} ${filtered.length === 1 ? "usuário encontrado" : "usuários encontrados"}`} />
+      <div className="admin-filter-bar"><input aria-label="Buscar usuários" placeholder="Buscar por nome ou e-mail" value={search} onChange={event => change(setSearch, event.target.value)} /><select aria-label="Filtrar por perfil" value={role} onChange={event => change(setRole, event.target.value)}><option value="">Todos os perfis</option><option value="ADMIN">Administrador</option><option value="PROFESSIONAL">Profissional</option></select><select aria-label="Filtrar por status" value={status} onChange={event => change(setStatus, event.target.value)}><option value="">Todos os status</option><option value="true">Ativos</option><option value="false">Inativos</option></select><select aria-label="Ordenar usuários" value={sort} onChange={event => change(setSort, event.target.value)}><option value="name">Ordenar por nome</option><option value="role">Ordenar por perfil</option><option value="status">Ordenar por status</option></select>{hasFilters && <button className="clear-filters" onClick={clearFilters}>Limpar filtros</button>}</div>
       <table>
         <thead>
           <tr>
@@ -1184,7 +1251,7 @@ export function Users({
           </tr>
         </thead>
         <tbody>
-          {filtered.map((u) => (
+          {visible.map((u) => (
             <tr key={u.id}>
               <td>
                 <strong>{u.name}</strong>
@@ -1198,26 +1265,38 @@ export function Users({
           ))}
         </tbody>
       </table>
-      {!filtered.length && <div className="empty">Nenhum usuário encontrado.</div>}
+      {!visible.length && <div className="empty">Nenhum usuário encontrado.</div>}
+      {pages > 1 && <div className="pagination"><span>Exibindo {safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div><button className="ghost" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>Anterior</button><span>Página {safePage + 1} de {pages}</span><button className="ghost" disabled={safePage >= pages - 1} onClick={() => setPage(safePage + 1)}>Próxima</button></div></div>}
     </section>
   );
 }
 function Audit({ data }: { data: AuditLog[] }) {
   const [search, setSearch] = useState("");
   const [action, setAction] = useState("");
+  const [actor, setActor] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [page, setPage] = useState(0);
+  const [selected, setSelected] = useState<AuditLog | null>(null);
+  const pageSize = 10;
   const actions = [...new Set(data.map(log => log.action))].sort();
+  const actors = [...new Map(data.map(log => [log.actorUserId ?? "anonymous", { id: log.actorUserId ?? "anonymous", name: log.actorName, email: log.actorEmail }])).values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   const filtered = data.filter(log => {
     const local = new Date(log.createdAt);
     const day = `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, "0")}-${String(local.getDate()).padStart(2, "0")}`;
     return (!search.trim() || [log.actorName, log.actorEmail ?? ""].some(value => value.toLocaleLowerCase("pt-BR").includes(search.trim().toLocaleLowerCase("pt-BR")))) &&
-      (!action || log.action === action) && (!from || day >= from) && (!to || day <= to);
+      (!action || log.action === action) && (!actor || (log.actorUserId ?? "anonymous") === actor) && (!from || day >= from) && (!to || day <= to);
   });
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, pages - 1);
+  const visible = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize);
+  const hasFilters = Boolean(search || action || actor || from || to);
+  function change(setter: (value: string) => void, value: string) { setter(value); setPage(0); }
+  function clearFilters() { setSearch(""); setAction(""); setActor(""); setFrom(""); setTo(""); setPage(0); }
   return (
     <section className="panel">
-      <Panel title="Eventos de auditoria" />
-      <div className="admin-filter-bar audit-filter-bar"><input aria-label="Buscar autor" placeholder="Buscar autor ou e-mail" value={search} onChange={event => setSearch(event.target.value)} /><select aria-label="Filtrar por ação" value={action} onChange={event => setAction(event.target.value)}><option value="">Todas as ações</option>{actions.map(value => <option key={value} value={value}>{value}</option>)}</select><label>De<input type="date" value={from} onChange={event => setFrom(event.target.value)} /></label><label>Até<input type="date" value={to} onChange={event => setTo(event.target.value)} /></label></div>
+      <Panel title={`${filtered.length} ${filtered.length === 1 ? "evento encontrado" : "eventos encontrados"}`} />
+      <div className="admin-filter-bar audit-filter-bar"><input aria-label="Buscar autor" placeholder="Buscar autor ou e-mail" value={search} onChange={event => change(setSearch, event.target.value)} /><select aria-label="Filtrar por ação" value={action} onChange={event => change(setAction, event.target.value)}><option value="">Todas as ações</option>{actions.map(value => <option key={value} value={value}>{auditActionLabel(value)}</option>)}</select><select aria-label="Filtrar por usuário" value={actor} onChange={event => change(setActor, event.target.value)}><option value="">Todos os usuários</option>{actors.map(value => <option key={value.id} value={value.id}>{value.name}{value.email ? ` · ${value.email}` : ""}</option>)}</select><label>De<input type="date" value={from} onChange={event => change(setFrom, event.target.value)} /></label><label>Até<input type="date" value={to} onChange={event => change(setTo, event.target.value)} /></label>{hasFilters && <button className="clear-filters" onClick={clearFilters}>Limpar filtros</button>}</div>
       <table>
         <thead>
           <tr>
@@ -1226,30 +1305,35 @@ function Audit({ data }: { data: AuditLog[] }) {
             <th>Ação</th>
             <th>Recurso</th>
             <th>IP</th>
+            <th />
           </tr>
         </thead>
         <tbody>
-          {filtered.map((l) => (
+          {visible.map((l) => (
             <tr key={l.id}>
               <td>{new Date(l.createdAt).toLocaleString("pt-BR")}</td>
               <td>
                 <strong>{l.actorName}</strong>
                 <small>{l.actorEmail ?? l.actorRole ?? "—"}</small>
               </td>
-              <td>{l.action}</td>
+              <td>{auditActionLabel(l.action)}</td>
               <td>
                 {l.resourceType}
                 {l.resourceId ? ` · ${l.resourceId}` : ""}
               </td>
               <td>{l.ipAddress || "—"}</td>
+              <td className="row-actions"><button className="link" onClick={() => setSelected(l)}>Detalhes</button></td>
             </tr>
           ))}
         </tbody>
       </table>
-      {!filtered.length && <div className="empty">Nenhum evento encontrado.</div>}
+      {!visible.length && <div className="empty">Nenhum evento encontrado.</div>}
+      {pages > 1 && <div className="pagination"><span>Exibindo {safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div><button className="ghost" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>Anterior</button><span>Página {safePage + 1} de {pages}</span><button className="ghost" disabled={safePage >= pages - 1} onClick={() => setPage(safePage + 1)}>Próxima</button></div></div>}
+      {selected && <div className="modal-backdrop"><section className="modal"><div className="modal-head"><h2>Detalhes do evento</h2><button onClick={() => setSelected(null)} aria-label="Fechar detalhes">×</button></div><div className="audit-detail"><div><small>Data e horário</small><strong>{new Date(selected.createdAt).toLocaleString("pt-BR")}</strong></div><div><small>Ação</small><strong>{auditActionLabel(selected.action)}</strong></div><div><small>Usuário</small><strong>{selected.actorName}</strong><span>{selected.actorEmail ?? selected.actorRole ?? "Não autenticado"}</span></div><div><small>IP de origem</small><strong>{selected.ipAddress || "Não informado"}</strong></div><div><small>Tipo de recurso</small><strong>{selected.resourceType}</strong></div><div><small>Identificador do recurso</small><strong>{selected.resourceId || "Não informado"}</strong></div></div><div className="form-actions"><button className="ghost" onClick={() => setSelected(null)}>Fechar</button></div></section></div>}
     </section>
   );
 }
+function auditActionLabel(action: string) { return action.split("_").map(word => word.charAt(0) + word.slice(1).toLocaleLowerCase("pt-BR")).join(" "); }
 function Panel({ title, action }: { title: string; action?: React.ReactNode }) {
   return (
     <div className="panel-title">

@@ -49,6 +49,7 @@ export function PatientDetails({
 }) {
   const [items, setItems] = useState<Appointment[]>([]),
     [error, setError] = useState(""),
+    [success, setSuccess] = useState(""),
     [tab, setTab] = useState<"overview" | "sessions" | "finance" | "patient">("overview"),
     [editingSession, setEditingSession] = useState<Appointment | null>(null),
     [viewingSession, setViewingSession] = useState<Appointment | null>(null),
@@ -151,6 +152,7 @@ export function PatientDetails({
         </div>
       </div>
       {error && <div className="error banner"><span>{error}</span><button type="button" className="banner-close" onClick={() => setError("")} aria-label="Fechar aviso">×</button></div>}
+      {success && <div className="success banner" role="status"><span>{success}</span><button type="button" className="banner-close" onClick={() => setSuccess("")} aria-label="Fechar aviso">×</button></div>}
       <div className="patient-tabs" role="tablist" aria-label="Informações do paciente">
         <button role="tab" aria-selected={tab === "overview"} className={tab === "overview" ? "active" : ""} onClick={() => setTab("overview")}>Visão geral</button>
         <button role="tab" aria-selected={tab === "sessions"} className={tab === "sessions" ? "active" : ""} onClick={() => setTab("sessions")}>Sessões</button>
@@ -163,10 +165,11 @@ export function PatientDetails({
           <SummaryCard tone="upcoming" icon="◷" value={next.length} label="Próximas sessões" detail={next.length === 1 ? "Agendada" : "Agendadas"} />
           <SummaryCard tone="no-show" icon="×" value={historyTotals.noShow} label="Faltas" detail="Não compareceu" />
           <SummaryCard tone="canceled" icon="⊘" value={historyTotals.canceled} label="Cancelamentos" detail="Pelo paciente ou profissional" />
+          <SummaryCard tone="pending" icon="!" value={historyTotals.pending} label="Sessões pendentes" detail="Aguardam atualização" />
         </div>
         <div className="patient-session-grid">
           <SessionList title="Próximas sessões" empty="Nenhuma sessão agendada." emptyDetail="Este paciente não possui sessões futuras agendadas." emptyAction="Agendar sessão" onEmptyAction={newSession} items={next} onSelect={setViewingSession} />
-          <SessionList title="Últimas sessões" empty="Nenhuma sessão no histórico." items={history} action="Ver todas →" onAction={() => setTab("sessions")} onSelect={item => patient.active && (item.status === "SCHEDULED" || item.status === "CONFIRMED") ? setEditingSession(item) : setViewingSession(item)} />
+          <SessionList title="Últimas sessões" recent empty="Nenhuma sessão no histórico." items={history} action="Ver todas →" onAction={() => setTab("sessions")} onSelect={item => patient.active && (item.status === "SCHEDULED" || item.status === "CONFIRMED") ? setEditingSession(item) : setViewingSession(item)} />
         </div>
       </>}
       {tab === "sessions" && <HistoryList items={filteredHistory} totals={historyTotals} status={historyStatus} period={historyPeriod} setStatus={setHistoryStatus} setPeriod={setHistoryPeriod} onSelect={item => patient.active && (item.status === "SCHEDULED" || item.status === "CONFIRMED") ? setEditingSession(item) : setViewingSession(item)} />}
@@ -186,6 +189,7 @@ export function PatientDetails({
             });
             setEditingSession(null);
             await loadSessions();
+            setSuccess("Resultado da sessão atualizado com sucesso.");
           }}
         />
       )}
@@ -257,12 +261,27 @@ function Stat({
     </article>
   );
 }
-function SummaryCard({ tone, icon, value, label, detail }: { tone: "completed" | "upcoming" | "no-show" | "canceled"; icon: string; value: number; label: string; detail: string }) {
+function SummaryCard({ tone, icon, value, label, detail }: { tone: "completed" | "upcoming" | "no-show" | "canceled" | "pending"; icon: string; value: number; label: string; detail: string }) {
   return <article className={`summary-card ${tone}`}>
     <span className="summary-icon" aria-hidden="true">{icon}</span>
     <span className="summary-copy"><strong>{value}</strong><b>{label}</b><small>{detail}</small></span>
   </article>;
 }
+function recentStatus(item: Appointment) {
+  if (new Date(item.endsAt).getTime() < Date.now() && (item.status === "SCHEDULED" || item.status === "CONFIRMED")) return ["Aguardando resultado", "pending"] as const;
+  if (item.status === "COMPLETED") return ["Realizada", "completed"] as const;
+  if (item.status === "NO_SHOW") return ["Não compareceu", "no-show"] as const;
+  if (item.status === "CANCELED") return ["Cancelada", "canceled"] as const;
+  return [labels[item.status], "scheduled"] as const;
+}
+function recentMeta(item: Appointment) {
+  const start = new Date(item.startsAt), end = new Date(item.endsAt), minutes = Math.round((end.getTime() - start.getTime()) / 60000);
+  const clock = (value: Date) => value.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return `${clock(start)} – ${clock(end)} (${minutes} min)`;
+}
+function patientSessionDay(value: string) { return new Date(value).toLocaleDateString("pt-BR", { day: "2-digit" }); }
+function patientSessionMonth(value: string) { return new Date(value).toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""); }
+function patientSessionDate(value: string) { return new Date(value).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "short" }); }
 function SessionList({
   title,
   items,
@@ -273,6 +292,7 @@ function SessionList({
   action,
   onAction,
   onSelect,
+  recent = false,
 }: {
   title: string;
   items: Appointment[];
@@ -283,17 +303,18 @@ function SessionList({
   action?: string;
   onAction?: () => void;
   onSelect?: (item: Appointment) => void;
+  recent?: boolean;
 }) {
   return (
-    <article className="patient-session-list">
+    <article className={`patient-session-list patient-session-overview${recent ? " patient-session-recent" : ""}`}>
       <header>
-        <span className="eyebrow">{title}</span>{action && onAction && <button type="button" className="session-list-action" onClick={onAction}>{action}</button>}
+        <span className="eyebrow"><span className="recent-title-icon" aria-hidden="true">{recent ? <PatientClockIcon /> : <PatientCalendarIcon />}</span>{title}</span>{action && onAction && <button type="button" className="session-list-action" onClick={onAction}>{action}</button>}
       </header>
       {items.length ? (
         <div>
           {items.slice(0, 5).map((item) => (
             <div className="patient-session" key={item.id}>
-              {onSelect ? <button className="patient-session-open" onClick={() => onSelect(item)} aria-label={`Editar sessão de ${date(item.startsAt)}`}><strong>{date(item.startsAt)}</strong><span>{sessionStatus(item)} · {item.modality === "ONLINE" ? "Online" : "Presencial"}</span></button> : <><strong>{date(item.startsAt)}</strong><span>{sessionStatus(item)} · {item.modality === "ONLINE" ? "Online" : "Presencial"}</span></>}
+              {onSelect ? <PatientOverviewSession item={item} select={onSelect} recent={recent} /> : <><strong>{date(item.startsAt)}</strong><span>{sessionStatus(item)} · {item.modality === "ONLINE" ? "Online" : "Presencial"}</span></>}
             </div>
           ))}
         </div>
@@ -303,6 +324,13 @@ function SessionList({
     </article>
   );
 }
+function PatientOverviewSession({ item, select, recent }: { item: Appointment; select: (item: Appointment) => void; recent: boolean }) {
+  const [label, tone] = recentStatus(item);
+  return <button className="patient-session-open patient-session-rich" onClick={() => select(item)} aria-label={`Ver sessão de ${date(item.startsAt)}`}><span className="patient-date-tile"><strong>{patientSessionDay(item.startsAt)}</strong><small>{patientSessionMonth(item.startsAt)}</small></span><span className="recent-copy"><strong>{item.patientName}</strong><span>{patientSessionDate(item.startsAt)}</span></span><span className="patient-session-meta"><i aria-hidden="true"><PatientClockIcon /></i>{recentMeta(item)} <i aria-hidden="true"><PatientVideoIcon /></i> {item.modality === "ONLINE" ? "Online" : "Presencial"}</span><b className={`recent-status ${recent ? tone : "scheduled"}`}>{recent ? label : item.status === "CONFIRMED" ? "Confirmada" : "Agendada"}</b><i className="patient-session-menu" aria-hidden="true">⋮</i></button>;
+}
+function PatientCalendarIcon() { return <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18M8 14h3M8 17h5"/></svg>; }
+function PatientClockIcon() { return <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.8"/><path d="M8 4.5V8l2.4 1.6"/></svg>; }
+function PatientVideoIcon() { return <svg viewBox="0 0 16 16"><rect x="1.5" y="4" width="9" height="8" rx="1.5"/><path d="m10.5 6.5 4-2v7l-4-2"/></svg>; }
 function HistoryList({ items, totals, status, period, setStatus, setPeriod, onSelect }: { items: Appointment[]; totals: { total: number; completed: number; canceled: number; noShow: number; pending: number }; status: string; period: string; setStatus: (value: string) => void; setPeriod: (value: string) => void; onSelect: (item: Appointment) => void }) {
   const totalsButtons: [string, string, number][] = [["", "Todas", totals.total], ["COMPLETED", "Realizadas", totals.completed], ["CANCELED", "Canceladas", totals.canceled], ["NO_SHOW", "Não compareceu", totals.noShow], ["PENDING", "Pendentes", totals.pending]];
   return <article className="patient-session-list patient-history-list" role="tabpanel">

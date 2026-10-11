@@ -26,7 +26,7 @@ test('@homolog cadastro, paciente, sessão e proteção de desativação', async
   await page.getByText(patient, { exact: true }).click()
   await page.getByRole('button', { name: '+ Nova sessão' }).click()
   await expect(page.getByRole('heading', { name: 'Nova sessão' })).toBeVisible()
-  await page.getByLabel('Modalidade').selectOption('ONLINE')
+  await page.locator('select[name="modality"]').selectOption('ONLINE')
   await page.getByRole('button', { name: 'Salvar sessão' }).click()
   await expect(page.getByRole('heading', { name: 'Sessões' })).toBeVisible()
 
