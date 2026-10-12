@@ -1,0 +1,8 @@
+import {useEffect,useState} from "react";
+import {api,type Session,type RescheduleHistoryEntry} from "./api";
+export function RescheduleHistory({session,id,timezone}:{session:Session;id:string;timezone:string}) {
+ const [open,setOpen]=useState(false),[entries,setEntries]=useState<RescheduleHistoryEntry[]|null>(null),[error,setError]=useState("");
+ useEffect(()=>{if(!open)return;let active=true;api.rescheduleHistory(session,id).then(items=>{if(active)setEntries(items);}).catch(e=>{if(active)setError(e instanceof Error?e.message:"Não foi possível carregar o histórico");});return()=>{active=false;};},[session,id,open]);
+ const date=(value:string)=>new Date(value).toLocaleString("pt-BR",{timeZone:timezone,dateStyle:"medium",timeStyle:"short"});
+ return <section className="reschedule-history"><button className="link" type="button" aria-expanded={open} onClick={()=>setOpen(value=>!value)}>{open?"Ocultar histórico de reagendamentos":"Ver histórico de reagendamentos"}</button>{open&&(error?<p className="error" role="alert">{error}</p>:entries===null?<p>Carregando histórico…</p>:entries.length?entries.map(entry=><article key={entry.id}><header><strong>{entry.actorName}</strong><small>Alteração em {date(entry.changedAt)}</small></header><dl><div><dt>Horário anterior</dt><dd>{date(entry.previousStart)} até {date(entry.previousEnd)}</dd></div><div><dt>Novo horário</dt><dd>{date(entry.newStart)} até {date(entry.newEnd)}</dd></div><div><dt>Motivo</dt><dd>{entry.reason||"Não informado"}</dd></div></dl></article>):<p>Nenhum reagendamento registrado. O histórico começa após a ativação desta funcionalidade.</p>)}</section>;
+}

@@ -8,3 +8,9 @@
 .session-readonly dt { color: #75817d; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
 .session-readonly dd { margin: 4px 0 0; font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
 @media (max-width: 560px) { .session-readonly dl { grid-template-columns: 1fr; } }
+
+.reschedule-history { margin-top:18px; padding-top:12px; border-top:1px solid #e3e9e4; }
+.reschedule-history > p { color:#75817d; font-size:12px; }
+.reschedule-history article { margin-top:12px; padding:14px; border:1px solid #e3e9e4; border-radius:9px; }
+.reschedule-history header { display:grid; gap:4px; }.reschedule-history header small { color:#75817d; font-size:11px; }
+.reschedule-history dl { display:grid; gap:12px; margin:14px 0 0; }.reschedule-history dt { color:#75817d; font-size:11px; }.reschedule-history dd { margin:4px 0 0; font-size:13px; white-space:pre-wrap; overflow-wrap:anywhere; }

@@ -4,3 +4,12 @@
 .hour-slot.blocked{cursor:not-allowed;background:#9b86651a}.schedule-block{position:absolute;z-index:1;left:4px;right:4px;width:calc(100% - 8px);overflow:hidden;border:1px dashed #9b7a45;border-radius:7px;padding:6px 7px;background:repeating-linear-gradient(-45deg,#f6ecda,#f6ecda 5px,#f1e2c9 5px,#f1e2c9 10px);color:#765a2e;text-align:left;display:grid;align-content:start;gap:2px}.schedule-block time{font-size:9px;font-weight:800}.schedule-block strong{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .danger-button{border:0;border-radius:9px;padding:11px 15px;background:#b34c40;color:#fff;font-weight:800}.danger-button:disabled{opacity:.6}
 .session-series-option{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid #dce8e2;border-radius:9px;background:#f5faf7;cursor:pointer}.session-series-option input{width:18px;height:18px;accent-color:#257064}.session-series-option span{display:grid;gap:2px}.session-series-option small{color:#75817d}
+
+/* Fixed text rows prevent the patient's name from collapsing inside short appointments. */
+.calendar-day .session-card { box-sizing:border-box; padding:4px 7px; grid-template-rows:10px 14px 10px; gap:1px; }
+.calendar-day .session-card time { margin:0; line-height:10px; }
+.calendar-day .session-card strong { display:block; min-height:14px; margin:0; font-size:11px; line-height:14px; }
+.calendar-day .session-card small { margin:0; line-height:10px; }
+.calendar-day .session-card-compact { padding:2px 7px; grid-template-rows:10px 13px; }
+.calendar-day .session-card-compact strong { min-height:13px; line-height:13px; }
+.calendar-day .session-card-compact small { display:none; }

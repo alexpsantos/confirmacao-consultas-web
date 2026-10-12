@@ -1,7 +1,10 @@
+import {ProfessionalFinance} from "./ProfessionalFinance";
+import {dateValue, DEFAULT_TIMEZONE} from "./timezone";
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {
   api,
+  API_URL,
   type AuditLog,
   type Appointment,
   type OperationalSummary,
@@ -52,6 +55,7 @@ type View =
   | "profile"
   | "patients"
   | "patient-detail"
+  | "finance"
   | "sessions"
   | "professionals"
   | "users"
@@ -361,6 +365,7 @@ function Dashboard({
       patients: "Pacientes",
       "patient-detail": "Paciente",
       sessions: "Sessões",
+      finance: "Financeiro",
       professionals: "Profissionais",
       users: "Usuários",
       audit: "Auditoria",
@@ -415,6 +420,7 @@ function Dashboard({
                 active={view === "sessions"}
                 go={() => setView("sessions")}
               />
+              <Nav text="Financeiro" active={view === "finance"} go={() => setView("finance")} />
               <Nav
                 text="Pacientes"
                 active={view === "patients" || view === "patient-detail"}
@@ -476,6 +482,7 @@ function Dashboard({
         {view === "profile" && (
           <Profile item={professionals[0]} session={session} saved={async () => { await load(); setSuccess("Perfil atualizado com sucesso."); }} />
         )}{" "}
+        {view === "finance" && !admin && professionals[0] && <ProfessionalFinance session={session} patients={patients} timezone={professionals[0].timezone} openPatient={patient => {setSelectedPatient(patient);setView("patient-detail");}} />}
         {view === "sessions" && !admin && (
           <SessionsView session={session} patients={patients} professional={professionals[0]} initialPatientId={schedulePatientId ?? undefined} openNewSession={scheduleNewSession} onInitialPatientHandled={() => { setSchedulePatientId(null); setScheduleNewSession(false); }} />
         )}{" "}
@@ -643,7 +650,7 @@ function Overview({
           detail="no período selecionado"
         />
       </section><div className="admin-operational-period"><label>Período dos indicadores<select value={operationalPeriod} onChange={event => setOperationalPeriod(event.target.value as OperationalPeriod)}><option value="month">Este mês</option><option value="7d">Últimos 7 dias</option><option value="30d">Últimos 30 dias</option></select></label></div></>}
-      {!admin && <ProfessionalOverview session={session} patients={patients} openPatient={openPatient} go={() => go("sessions")} newPatient={newPatient} newSession={newSession} />}
+      {!admin && <ProfessionalOverview timezone={professionals[0]?.timezone ?? DEFAULT_TIMEZONE} session={session} patients={patients} openPatient={openPatient} go={() => go("sessions")} newPatient={newPatient} newSession={newSession} />}
       {admin && <section className="overview-grid">
         <article className="welcome operational">
           <div>
@@ -688,7 +695,8 @@ function Overview({
     </>
   );
 }
-function ProfessionalOverview({ session, patients, openPatient, go, newPatient, newSession }: {
+function ProfessionalOverview({ timezone, session, patients, openPatient, go, newPatient, newSession }: {
+  timezone: string;
   session: Session;
   patients: Patient[];
   openPatient: (patient: Patient) => void;
@@ -722,20 +730,20 @@ function ProfessionalOverview({ session, patients, openPatient, go, newPatient, 
   const pending = appointments
     .filter(item => (item.status === "SCHEDULED" || item.status === "CONFIRMED") && new Date(item.endsAt).getTime() < now)
     .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
-  const today = new Date().toDateString();
-  const todaySessions = appointments.filter(item => new Date(item.startsAt).toDateString() === today).sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+  const today = dateValue(new Date(),timezone);
+  const todaySessions = appointments.filter(item => dateValue(item.startsAt,timezone) === today).sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   const todayUpcoming = todaySessions.filter(item => (item.status === "SCHEDULED" || item.status === "CONFIRMED") && new Date(item.startsAt).getTime() > now).length;
   const todayCanceled = todaySessions.filter(item => item.status === "CANCELED").length;
   const awaitingConfirmation = upcoming.filter(item => item.status === "SCHEDULED").length;
   const confirmedUpcoming = upcoming.filter(item => item.status === "CONFIRMED").length;
   const activePatients = patients.filter(item => item.active).length;
   const firstName = session.name.trim().split(/\s+/)[0] || "";
-  const todayLabel = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
-  const dateTime = (value: string) => new Date(value).toLocaleString("pt-BR", { dateStyle: "medium", timeStyle: "short" });
-  const sessionDate = (value: string) => new Date(value).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "short" });
-  const sessionDay = (value: string) => new Date(value).toLocaleDateString("pt-BR", { day: "2-digit" });
-  const sessionMonth = (value: string) => new Date(value).toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
-  const sessionTime = (item: Appointment) => `${new Date(item.startsAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} – ${new Date(item.endsAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+  const todayLabel = new Date().toLocaleDateString("pt-BR", { timeZone: timezone, weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+  const dateTime = (value: string) => new Date(value).toLocaleString("pt-BR", { timeZone: timezone, dateStyle: "medium", timeStyle: "short" });
+  const sessionDate = (value: string) => new Date(value).toLocaleDateString("pt-BR", { timeZone: timezone, weekday: "long", day: "2-digit", month: "short" });
+  const sessionDay = (value: string) => new Date(value).toLocaleDateString("pt-BR", { timeZone: timezone, day: "2-digit" });
+  const sessionMonth = (value: string) => new Date(value).toLocaleDateString("pt-BR", { timeZone: timezone, month: "short" }).replace(".", "");
+  const sessionTime = (item: Appointment) => `${new Date(item.startsAt).toLocaleTimeString("pt-BR", { timeZone: timezone, hour: "2-digit", minute: "2-digit" })} – ${new Date(item.endsAt).toLocaleTimeString("pt-BR", { timeZone: timezone, hour: "2-digit", minute: "2-digit" })}`;
   async function updatePendingStatus(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedPending) return;
@@ -771,7 +779,7 @@ function ProfessionalOverview({ session, patients, openPatient, go, newPatient, 
         <div className="overview-card-head overview-agenda-head"><h2><span className="overview-agenda-title-icon" aria-hidden="true"><OverviewIcon type="calendar" /></span>Sua agenda de hoje</h2><button className="link" onClick={go}>Ver agenda semanal ›</button></div>
         <div className="overview-day-list">
           {todaySessions.length ? todaySessions.map(item => <button key={item.id} onClick={() => new Date(item.endsAt).getTime() < now && (item.status === "SCHEDULED" || item.status === "CONFIRMED") ? setSelectedPending(item) : setSelectedUpcoming(item)}>
-            <time>{new Date(item.startsAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</time><span><strong>{item.patientName}</strong><small>{item.modality === "ONLINE" ? "Online" : "Presencial"}</small></span><i className={`overview-status ${item.status.toLowerCase()}`}>{item.status === "SCHEDULED" ? "Agendada" : item.status === "CONFIRMED" ? "Confirmada" : item.status === "COMPLETED" ? "Realizada" : item.status === "CANCELED" ? "Cancelada" : "Não compareceu"}</i>
+            <time>{new Date(item.startsAt).toLocaleTimeString("pt-BR", { timeZone: timezone, hour: "2-digit", minute: "2-digit" })}</time><span><strong>{item.patientName}</strong><small>{item.modality === "ONLINE" ? "Online" : "Presencial"}</small></span><i className={`overview-status ${item.status.toLowerCase()}`}>{item.status === "SCHEDULED" ? "Agendada" : item.status === "CONFIRMED" ? "Confirmada" : item.status === "COMPLETED" ? "Realizada" : item.status === "CANCELED" ? "Cancelada" : "Não compareceu"}</i>
           </button>) : <div className="overview-empty overview-empty-agenda">
             <span className="overview-empty-calendar" aria-hidden="true"><svg viewBox="0 0 64 64"><rect x="12" y="17" width="40" height="36" rx="5"/><path d="M20 10v13M44 10v13M12 28h40M25 39l6 6 11-12"/><path className="overview-empty-rays" d="M53 16l5-4M56 25h7M51 9l2-6"/></svg></span>
             <strong>Nenhum atendimento agendado para hoje</strong><span>Aproveite para adiantar pendências ou agendar novos pacientes.</span><button className="primary overview-empty-action" onClick={newSession}>＋ Novo agendamento</button>
@@ -875,7 +883,14 @@ function Profile({
   const [editing, setEditing] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [tab, setTab] = useState<"details" | "preferences" | "billing">("details");
+    [tab, setTab] = useState<"details" | "preferences" | "billing">("details"),
+    [defaultSessionPrice, setDefaultSessionPrice] = useState("100.00");
+  useEffect(() => {
+    fetch(`${API_URL}/api/v1/professionals/me/session-price`, { headers: { Authorization: `Bearer ${session.accessToken}` } })
+      .then(async response => { if (!response.ok) throw new Error(); return response.json() as Promise<{ value: number }>; })
+      .then(data => setDefaultSessionPrice(String(data.value)))
+      .catch(() => setError("Não foi possível carregar o valor padrão da sessão."));
+  }, [session.accessToken]);
   if (!item)
     return (
       <section className="panel">
@@ -900,6 +915,10 @@ function Profile({
         defaultModality: f.get("defaultModality") ?? item.defaultModality ?? "PRESENTIAL",
         remindersEnabled: f.get("remindersEnabled") === "true" || (f.get("remindersEnabled") === null && item.remindersEnabled !== false),
       });
+      const price = String(f.get("defaultSessionPrice") ?? defaultSessionPrice).replace(",", ".");
+      const priceResponse = await fetch(`${API_URL}/api/v1/professionals/me/session-price`, { method: "PUT", headers: { Authorization: `Bearer ${session.accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ value: Number(price) }) });
+      if (!priceResponse.ok) throw new Error("Não foi possível salvar o valor da sessão");
+      setDefaultSessionPrice(price);
       await saved();
       setEditing(false);
     } catch (x) {
@@ -992,6 +1011,10 @@ function Profile({
             <select name="defaultSessionMinutes" defaultValue={String(item.defaultSessionMinutes ?? 60)}>{Array.from({ length: 46 }, (_, index) => 15 + index * 5).map(minutes => <option key={minutes} value={minutes}>{minutes} minutos</option>)}</select>
           </label>
           <label>
+            Valor da sessão
+            <input name="defaultSessionPrice" type="number" min="0" step="0.01" defaultValue={defaultSessionPrice} inputMode="decimal" placeholder="0,00" />
+          </label>
+          <label>
             Modalidade padrão
             <select name="defaultModality" defaultValue={item.defaultModality ?? "PRESENTIAL"}><option value="PRESENTIAL">Presencial</option><option value="ONLINE">Online</option></select>
           </label>
@@ -1046,6 +1069,7 @@ function Profile({
           </> : <>
           <div><span>Fuso horário</span><strong>{item.timezone === "America/Sao_Paulo" ? "Brasília (GMT-3)" : item.timezone}</strong></div>
           <div><span>Duração padrão</span><strong>{item.defaultSessionMinutes ?? 60} minutos</strong></div>
+          <div><span>Valor da sessão</span><strong>{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(defaultSessionPrice) || 0)}</strong></div>
           <div><span>Modalidade padrão</span><strong>{item.defaultModality === "ONLINE" ? "Online" : "Presencial"}</strong></div>
           <div><span>Lembretes e avisos</span><strong>{item.remindersEnabled === false ? "Desativados" : "Ativados"}</strong></div>
           </>}

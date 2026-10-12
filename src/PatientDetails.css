@@ -66,7 +66,7 @@
 .patient-finance h3 { margin: 5px 0; font: 500 24px Georgia, serif; }.patient-finance header p, .finance-note { margin: 0; color: #75817d; font-size: 13px; }
 .finance-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .finance-summary .patient-summary { display: contents; }.finance-summary article { padding: 18px; background: #f8faf8; border: 1px solid #e2e9e3; border-radius: 12px; }.finance-summary small { display: block; text-transform: uppercase; letter-spacing: .08em; font-size: 10px; font-weight: 700; color: #6d7e78; }.finance-summary strong { display: block; margin: 8px 0 3px; font: 500 21px Georgia, serif; }.finance-summary span { color: #75817d; font-size: 12px; }
-.finance-table-wrap { overflow-x: auto; border: 1px solid #e4e8e4; border-radius: 10px; }.finance-table { width: 100%; border-collapse: collapse; min-width: 440px; }.finance-table th { padding: 11px 14px; background: #f7f9f7; color: #6d7e78; text-align: left; text-transform: uppercase; letter-spacing: .08em; font-size: 10px; }.finance-table td { padding: 12px 14px; border-top: 1px solid #edf0ec; font-size: 13px; }.finance-table td:first-child { display: grid; gap: 3px; }.finance-table td small { color: #75817d; }.finance-empty { text-align: center; color: #75817d; }.finance-status { display: inline-block; padding: 4px 8px; border-radius: 99px; font-size: 11px; font-weight: 700; }.finance-status.completed { color: #176f51; background: #e5f4eb; }.finance-status.canceled { color: #a04438; background: #f9e9e6; }.finance-status.scheduled, .finance-status.confirmed, .finance-status.no_show { color: #946218; background: #fff1d9; }
+.finance-table-wrap { overflow-x: auto; border: 1px solid #e4e8e4; border-radius: 10px; }.finance-table { width: 100%; border-collapse: collapse; min-width: 440px; }.finance-table th { padding: 11px 14px; background: #f7f9f7; color: #6d7e78; text-align: left; text-transform: uppercase; letter-spacing: .08em; font-size: 10px; }.finance-table td { padding: 12px 14px; border-top: 1px solid #edf0ec; font-size: 13px; }.finance-table td { vertical-align: middle; }.finance-table td:first-child { display: table-cell; }.finance-table td:first-child > strong, .finance-table td:first-child > button, .finance-table td:first-child > small { display: block; }.finance-table td:first-child > small { margin-top: 3px; }.finance-table td small { color: #75817d; }.finance-empty { text-align: center; color: #75817d; }.finance-status { display: inline-block; padding: 4px 8px; border-radius: 99px; font-size: 11px; font-weight: 700; }.finance-status.completed { color: #176f51; background: #e5f4eb; }.finance-status.canceled { color: #a04438; background: #f9e9e6; }.finance-status.scheduled, .finance-status.confirmed, .finance-status.no_show { color: #946218; background: #fff1d9; }
 .patient-summary article,
 .patient-session-list {
   background: #fff;
@@ -103,8 +103,8 @@
 }
 .summary-card { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 16px; border: 1px solid #e1e5df; border-radius: 14px; text-align: left; }
 .summary-card.completed { background: linear-gradient(135deg, #f6fffa, #eff9f3); border-color: #dcefe2; }.summary-card.upcoming { background: linear-gradient(135deg, #f4faff, #edf6fe); border-color: #dceaf6; }.summary-card.no-show { background: linear-gradient(135deg, #fff7f7, #fef0f0); border-color: #f2dede; }.summary-card.canceled { background: linear-gradient(135deg, #fffaf3, #fff5e8); border-color: #f2e3cb; }.summary-card.pending { background: linear-gradient(135deg, #fffdf4, #fff7df); border-color: #f1e4b8; }
-.summary-icon { display: grid; place-items: center; flex: 0 0 38px; width: 38px; height: 38px; border-radius: 50%; font-size: 24px; font-weight: 700; line-height: 1; }.completed .summary-icon { color: #16865e; background: #dcf4e7; }.upcoming .summary-icon { color: #1887c5; background: #dceffd; }.no-show .summary-icon { color: #c64139; background: #ffe2e0; }.canceled .summary-icon { color: #b86e12; background: #fff0d4; }.pending .summary-icon { color: #9a6b19; background: #fff0c8; }
-.summary-copy { display: grid; min-width: 0; gap: 1px; }.summary-copy strong { margin: 0; font: 600 23px Georgia, serif; }.summary-copy b { overflow: hidden; color: #40534d; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }.summary-copy small { color: #75817d; font-size: 11px; }
+.summary-card .summary-icon { display: grid; place-items: center; flex: 0 0 38px; width: 38px; height: 38px; border-radius: 50%; font-size: 27.5px; font-weight: 700; line-height: 1; }.completed .summary-icon { color: #16865e; background: #dcf4e7; }.upcoming .summary-icon { color: #1887c5; background: #dceffd; }.no-show .summary-icon { color: #c64139; background: #ffe2e0; }.canceled .summary-icon { color: #b86e12; background: #fff0d4; }.pending .summary-icon { color: #9a6b19; background: #fff0c8; }
+.summary-copy { display: grid; min-width: 0; gap: 1px; }.patient-summary .summary-card .summary-copy strong { margin: 0; font: 600 23px/1.2 Georgia, serif; font-variant-numeric: lining-nums tabular-nums; }.summary-copy b { overflow: hidden; color: #40534d; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }.summary-copy small { color: #75817d; font-size: 11px; }
 .patient-session-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -186,3 +186,56 @@
   .patient-summary-actions { grid-template-columns: 1fr; }
   .finance-summary { grid-template-columns: 1fr; }
 }
+ .recent-copy > span { color: #66766f; }
+ .patient-session-meta { color: #60736b; }
+@media (max-width: 800px) {
+  .patient-session-rich { grid-template-columns: 54px minmax(0, 1fr) auto; gap: 8px; padding: 10px 12px; }
+  .patient-session-meta { grid-column: 2; white-space: normal; }
+  .patient-session-rich .recent-status { grid-column: 3; grid-row: 1 / span 2; }
+  .patient-session-menu { display: none; }
+}
+
+.finance-filters { display:flex; gap:12px; align-items:end; flex-wrap:wrap; }
+.finance-filters label { display:grid; gap:6px; font-size:12px; color:#536962; }
+.finance-filters input,.finance-filters select { padding:9px; border:1px solid #d5dfd9; border-radius:7px; background:white; }
+.finance-filters button,.finance-actions button { padding:8px 12px; border:1px solid #cddbd4; border-radius:7px; background:#f7faf8; color:#245f53; cursor:pointer; }
+.finance-actions { display:flex; gap:6px; flex-wrap:wrap; }
+.finance-note-text { display:block; max-width:280px; white-space:pre-wrap; overflow-wrap:anywhere; }
+.finance-note-toggle { display:block; margin-top:5px; padding:0; border:0; background:transparent; color:#267568; font:inherit; cursor:pointer; text-align:left; }
+.finance-note-toggle:hover { text-decoration:underline; }
+.finance-note-toggle:focus-visible { outline:2px solid #267568; outline-offset:3px; border-radius:2px; }
+.finance-history-modal { max-width:760px; max-height:85vh; overflow-y:auto; }
+.finance-history-list { display:grid; gap:16px; }
+.finance-history-list article { padding:16px; border:1px solid #dce6df; border-radius:10px; }
+.finance-history-list article header { display:grid; gap:5px; }
+.finance-history-states { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.finance-history-states h3 { font-size:14px; }
+.finance-snapshot { display:grid; grid-template-columns:auto 1fr; gap:8px; font-size:12px; }
+.finance-snapshot dt { color:#687f74; }.finance-snapshot dd { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; }
+.finance-summary { grid-template-columns:repeat(4,minmax(0,1fr)); }
+@media(max-width:700px) { .finance-history-states { grid-template-columns:1fr; }.finance-summary { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+.finance-actions .finance-history-button { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; padding:0; border-color:transparent; background:transparent; color:#748a82; }
+.finance-actions .finance-history-button:hover { color:#245f53; background:#edf4f0; }
+.finance-actions .finance-history-button:focus-visible { outline:2px solid #267568; outline-offset:2px; }
+
+.summary-card .summary-icon svg { display:block; width:27.5px; height:27.5px; flex-shrink:0; }
+
+.patient-data { display:grid; gap:22px; }
+.patient-data-heading { display:flex; justify-content:space-between; align-items:center; gap:16px; }
+.patient-data-heading h3 { margin:6px 0; font:500 26px Georgia,serif; }
+.patient-data-heading p { margin:0; color:#75817d; font-size:13px; }
+.patient-data-status { padding:7px 12px; border-radius:99px; font-size:12px; font-weight:700; white-space:nowrap; }
+.patient-data-status.active { color:#216c52; background:#e4f3eb; }.patient-data-status.inactive { color:#93493e; background:#f6e8e5; }
+.patient-data-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.patient-data-card { padding:24px; background:#fff; border:1px solid #e1e5df; border-radius:14px; min-width:0; }
+.patient-data-card header { display:flex; align-items:center; gap:12px; padding-bottom:18px; border-bottom:1px solid #edf0ec; }
+.patient-data-icon { width:38px; height:38px; flex:0 0 38px; border-radius:10px; background:#edf5f0; display:grid; place-items:center; color:#267568; }
+.patient-data-icon svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+.patient-data-card h4 { margin:0 0 4px; font-size:15px; color:#304a42; }.patient-data-card header p { margin:0; color:#75817d; font-size:12px; }
+.patient-data-card dl { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; margin:20px 0 0; }
+.patient-data-card dt { font-size:11px; color:#71837b; margin-bottom:7px; }.patient-data-card dd { margin:0; font-size:14px; font-weight:600; color:#304a42; overflow-wrap:anywhere; }
+.patient-data-wide { grid-column:1 / -1; }.patient-data-communication { grid-column:1 / -1; }
+.patient-data-hint { margin:0; color:#75817d; font-size:12px; }
+@media(max-width:700px) { .patient-data-grid { grid-template-columns:1fr; }.patient-data-heading { align-items:flex-start; flex-direction:column; }.patient-data-card { padding:20px; } }
+@media(max-width:420px) { .patient-data-card dl { grid-template-columns:1fr; } }
